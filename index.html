@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pick Me Up · Infinite Gacha Online</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #0D0010;
+      overflow: hidden;
+      font-family: 'Courier New', Courier, monospace;
+    }
+    #gameCanvas {
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+    #ui-layer {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 100;
+    }
+    /* ── POPUPS ─────────────────────────────────────────── */
+    .popup-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: all;
+    }
+    .popup-panel {
+      background: #12001A;
+      border: 2px solid #C0C0D0;
+      box-shadow: 0 0 15px #7B2FBE, inset 0 0 15px rgba(123,47,190,0.15);
+      padding: 32px 40px;
+      min-width: 480px;
+      max-width: 600px;
+      font-family: 'Courier New', Courier, monospace;
+      opacity: 0;
+      transform: translateY(18px);
+      transition: opacity 0.22s ease, transform 0.22s ease;
+    }
+    .popup-panel.visible { opacity: 1; transform: translateY(0); }
+    .popup-panel.hiding {
+      opacity: 0; transform: translateY(-12px);
+      transition: opacity 0.16s ease, transform 0.16s ease;
+    }
+    .popup-header { color: #FFFFFF; font-size: 14px; font-weight: bold; margin-bottom: 18px; letter-spacing: 1px; }
+    .popup-body { color: #E8D5FF; font-size: 13px; line-height: 1.7; min-height: 60px; white-space: pre-wrap; }
+    .popup-cursor { display: inline-block; color: #C8C8E0; animation: blink 0.6s step-end infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    .popup-input-wrap { margin-top: 20px; }
+    .popup-input {
+      width: 100%; background: #1A0025; border: 2px solid #C0C0D0;
+      color: #FFFFFF; font-family: 'Courier New', Courier, monospace;
+      font-size: 14px; padding: 8px 12px; outline: none; transition: box-shadow 0.2s;
+    }
+    .popup-input:focus { box-shadow: 0 0 10px #7B2FBE; }
+    .popup-error { color: #FF4444; font-size: 12px; margin-top: 6px; font-family: 'Courier New', Courier, monospace; min-height: 16px; }
+    .popup-btn-row { display: flex; gap: 12px; margin-top: 20px; justify-content: flex-end; }
+    .popup-btn {
+      background: #1A0025; border: 2px solid #C0C0D0; color: #FFFFFF;
+      font-family: 'Courier New', Courier, monospace; font-size: 13px;
+      padding: 8px 24px; cursor: pointer; letter-spacing: 1px;
+      transition: box-shadow 0.2s, background 0.2s; pointer-events: all;
+    }
+    .popup-btn:hover:not(:disabled) { box-shadow: 0 0 12px #7B2FBE; }
+    .popup-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .popup-btn.yes-btn { background: #2A0040; }
+    .popup-btn.yes-btn:hover { box-shadow: 0 0 12px #7B2FBE; }
+    /* ── HUB ────────────────────────────────────────────── */
+    #hub-ui {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      display: none; pointer-events: all; font-family: 'Courier New', Courier, monospace;
+    }
+    #hub-topbar {
+      position: absolute; top: 0; left: 0; right: 0; height: 60px;
+      background: #12001A; border-bottom: 2px solid #C0C0D0;
+      display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
+    }
+    #hub-topbar-left { color: #C0C0D0; font-size: 13px; letter-spacing: 2px; }
+    #hub-topbar-right { color: #E8D5FF; font-size: 13px; }
+    #hub-sidebar {
+      position: absolute; top: 60px; left: 0; width: 220px; bottom: 50px;
+      background: #12001A; border-right: 2px solid #C0C0D0;
+      display: flex; flex-direction: column; padding: 24px 16px; gap: 10px;
+    }
+    .hub-nav-btn {
+      background: #1A0025; border: 2px solid #C0C0D0; color: #FFFFFF;
+      font-family: 'Courier New', Courier, monospace; font-size: 13px;
+      padding: 10px 16px; cursor: pointer; text-align: left;
+      letter-spacing: 1px; transition: box-shadow 0.2s;
+    }
+    .hub-nav-btn:hover { box-shadow: 0 0 12px #7B2FBE; }
+    .hub-nav-btn.active { box-shadow: 0 0 12px #7B2FBE; color: #FFFFFF; background: #2A0040; }
+    #hub-main {
+      position: absolute; top: 60px; left: 220px; right: 0; bottom: 50px;
+      display: flex; align-items: center; justify-content: center; overflow-y: auto;
+    }
+    #hub-bottombar {
+      position: absolute; bottom: 0; left: 0; right: 0; height: 50px;
+      background: #12001A; border-top: 2px solid #C0C0D0;
+      display: flex; align-items: center; padding: 0 20px;
+    }
+    #hub-gems { color: #C0C0D0; font-size: 13px; cursor: default; user-select: none; }
+    /* ── TUTORIAL PLACEHOLDER ───────────────────────────── */
+    #tutorial-ui {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      display: none; align-items: center; justify-content: center;
+      flex-direction: column; gap: 24px; pointer-events: all;
+    }
+    #tutorial-text { color: #C0C0D0; font-size: 16px; letter-spacing: 2px; font-family: 'Courier New', Courier, monospace; }
+    /* ── BOOT ───────────────────────────────────────────── */
+    #boot-ui {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      background: #0D0010; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 0; pointer-events: none;
+    }
+    #boot-border {
+      position: absolute; top: 16px; left: 16px; right: 16px; bottom: 16px;
+      border: 2px solid #C0C0D0;
+      box-shadow: 0 0 15px #7B2FBE, inset 0 0 15px rgba(123,47,190,0.15);
+      pointer-events: none;
+    }
+    #boot-title { color: #FFFFFF; font-size: 52px; font-family: 'Courier New', Courier, monospace; letter-spacing: 6px; opacity: 0; transition: opacity 0.8s ease; margin-bottom: 10px; }
+    #boot-subtitle { color: #C0C0D0; font-size: 14px; font-family: 'Courier New', Courier, monospace; letter-spacing: 6px; opacity: 0; transition: opacity 0.6s ease; margin-bottom: 18px; }
+    #boot-rule { width: 400px; border: none; border-top: 1px solid #C0C0D0; opacity: 0; transition: opacity 0.4s ease; margin-bottom: 14px; }
+    #boot-status { color: #C0C0D0; font-size: 11px; font-family: 'Courier New', Courier, monospace; letter-spacing: 1px; min-height: 18px; margin-bottom: 20px; }
+    #boot-bar-wrap { width: 400px; height: 14px; border: 1px solid #C0C0D0; background: #0D0010; position: relative; opacity: 0; transition: opacity 0.3s ease; }
+    #boot-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #C0C0D0, #7B2FBE); transition: width 0.05s linear; }
+    #boot-fade { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #0D0010; opacity: 0; pointer-events: none; transition: opacity 0.5s ease; }
+    /* ── SUMMON SCENE ───────────────────────────────────── */
+    .summon-tab {
+      background: transparent; border: none; border-bottom: 3px solid transparent;
+      color: #E8D5FF; font-family: 'Courier New', Courier, monospace;
+      font-size: 13px; padding: 10px 22px; cursor: pointer; letter-spacing: 1px;
+      transition: color 0.2s, border-color 0.2s; margin-bottom: -2px;
+    }
+    .summon-tab:hover { color: #FFFFFF; }
+    .summon-tab.active { color: #FFFFFF; border-bottom-color: #C0C0D0; }
+    .pull-btn {
+      background: #1A0025; border: 2px solid #C0C0D0; color: #FFFFFF;
+      font-family: 'Courier New', Courier, monospace; font-size: 13px;
+      padding: 12px 22px; cursor: pointer; letter-spacing: 1px;
+      transition: box-shadow 0.2s;
+    }
+    .pull-btn:hover { box-shadow: 0 0 12px #7B2FBE; }
+    /* ── PULL ANIMATION OVERLAY ─────────────────────────── */
+    #pull-anim-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: #000000; z-index: 2000;
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center;
+      opacity: 0; transition: opacity 0.3s ease;
+    }
+    #pull-anim-overlay.visible { opacity: 1; }
+    #pull-flash {
+      position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; opacity: 0; transition: opacity 0.12s ease;
+    }
+    #pull-shake-container {
+      display: flex; flex-direction: column; align-items: center; gap: 36px;
+      position: relative; z-index: 1;
+    }
+    #pull-cards-area { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; max-width: 1040px; }
+    /* card base */
+    .pull-card {
+      position: relative; width: 90px; height: 130px;
+      transform-style: preserve-3d; transition: transform 0.55s cubic-bezier(0.4,0,0.2,1);
+    }
+    .pull-card.single { width: 170px; height: 240px; }
+    .pull-card.flipped { transform: rotateY(180deg); }
+    .pull-card-face {
+      position: absolute; width: 100%; height: 100%;
+      backface-visibility: hidden; border: 2px solid #C0C0D0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      font-family: 'Courier New', Courier, monospace;
+    }
+    .pull-card-back { background: #12001A; box-shadow: 0 0 10px #7B2FBE; }
+    .pull-card-back-symbol { color: #C0C0D0; font-size: 30px; opacity: 0.4; }
+    .pull-card-front { transform: rotateY(180deg); }
+    .pull-card-stars { font-size: 11px; margin-bottom: 5px; letter-spacing: 1px; }
+    .pull-card-name { color: #FFFFFF; font-size: 9px; text-align: center; padding: 0 4px; line-height: 1.4; }
+    .pull-card-sub { font-size: 8px; margin-top: 4px; }
+    .pull-card.single .pull-card-stars { font-size: 20px; margin-bottom: 12px; }
+    .pull-card.single .pull-card-name { font-size: 14px; }
+    .pull-card.single .pull-card-sub { font-size: 12px; margin-top: 8px; }
+    #pull-tap-prompt {
+      color: #C0C0D0; font-family: 'Courier New', Courier, monospace;
+      font-size: 16px; letter-spacing: 4px;
+      animation: blink 1s step-end infinite; cursor: pointer;
+    }
+    /* shake animations */
+    @keyframes shake {
+      0%,100%{transform:translate(0,0)} 15%{transform:translate(-5px,2px)}
+      30%{transform:translate(5px,-2px)} 45%{transform:translate(-7px,1px)}
+      60%{transform:translate(7px,-1px)} 75%{transform:translate(-4px,2px)}
+      90%{transform:translate(4px,-2px)}
+    }
+    @keyframes shake-hard {
+      0%,100%{transform:translate(0,0)} 10%{transform:translate(-10px,4px)}
+      20%{transform:translate(10px,-4px)} 30%{transform:translate(-12px,2px)}
+      40%{transform:translate(12px,-2px)} 50%{transform:translate(-10px,5px)}
+      60%{transform:translate(10px,-5px)} 70%{transform:translate(-7px,3px)}
+      80%{transform:translate(7px,-3px)} 90%{transform:translate(-4px,2px)}
+    }
+    .shake { animation: shake 0.45s ease; }
+    .shake-hard { animation: shake-hard 0.65s ease; }
+    /* ── RESULTS PANEL ──────────────────────────────────── */
+    #results-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.88); z-index: 1800;
+      display: none; align-items: center; justify-content: center;
+    }
+    #results-overlay.visible { display: flex; }
+    #results-panel {
+      background: #12001A; border: 2px solid #C0C0D0;
+      box-shadow: 0 0 20px #7B2FBE;
+      padding: 28px 36px; width: 580px; max-height: 80vh;
+      display: flex; flex-direction: column; gap: 0;
+    }
+    #results-header { color: #FFFFFF; font-size: 14px; letter-spacing: 2px; margin-bottom: 18px; }
+    #results-list { overflow-y: auto; flex: 1; }
+    .result-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 7px 0; border-bottom: 1px solid #2A003A;
+      font-family: 'Courier New', Courier, monospace;
+    }
+    .result-stars { min-width: 80px; font-size: 12px; letter-spacing: 1px; }
+    .result-name { color: #FFFFFF; flex: 1; font-size: 12px; }
+    .result-sub { color: #E8D5FF; font-size: 11px; }
+    #results-btn-row { display: flex; gap: 12px; margin-top: 20px; justify-content: flex-end; }
+    /* ── HERO ROSTER ────────────────────────────────────── */
+    .sort-btn {
+      background: #1A0025; border: 2px solid #C0C0D0; color: #FFFFFF;
+      font-family: 'Courier New', Courier, monospace; font-size: 11px;
+      padding: 6px 14px; cursor: pointer; letter-spacing: 1px; transition: box-shadow 0.2s;
+    }
+    .sort-btn:hover { box-shadow: 0 0 10px #7B2FBE; }
+    .sort-btn.active { box-shadow: 0 0 10px #7B2FBE; background: #2A0040; }
+    #hero-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 180px);
+      gap: 16px;
+    }
+    .hero-card {
+      position: relative; width: 180px; height: 220px;
+      background: #12001A; cursor: pointer;
+      transition: box-shadow 0.2s; overflow: hidden;
+      font-family: 'Courier New', Courier, monospace;
+    }
+    .hero-card:hover { box-shadow: 0 0 14px #7B2FBE; }
+    .hero-card-art {
+      width: 100%; height: 96px;
+      background: #080010; display: flex;
+      align-items: center; justify-content: center;
+      font-size: 11px; color: #1A0025; letter-spacing: 1px;
+      border-bottom-width: 1px; border-bottom-style: solid;
+    }
+    .hero-card-body {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 8px 6px; gap: 4px;
+    }
+    .hero-card-name {
+      color: #FFFFFF; font-size: 11px; text-align: center;
+      max-width: 164px; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
+    .hero-card-stars { font-size: 11px; letter-spacing: 1px; }
+    .hero-card-class { color: #E8D5FF; font-size: 10px; }
+    .hero-card-level { color: #C0C0D0; font-size: 10px; }
+    .hero-card-badge {
+      position: absolute; top: 6px;
+      font-size: 9px; padding: 2px 5px; letter-spacing: 1px;
+      font-family: 'Courier New', Courier, monospace;
+    }
+    .hero-card-badge.new   { left: 6px; background: #CC0000; color: #FFFFFF; }
+    .hero-card-badge.party { right: 6px; background: #5A4400; color: #FFD700; }
+    .hero-card-debug {
+      position: absolute; bottom: 5px; right: 6px;
+      font-size: 9px; font-family: 'Courier New', Courier, monospace;
+    }
+    /* ── HERO DETAIL PANEL ──────────────────────────────── */
+    #hero-detail-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.82); z-index: 1600;
+      display: none; align-items: center; justify-content: center;
+      pointer-events: all;
+    }
+    #hero-detail-panel {
+      background: #12001A; border: 2px solid #C0C0D0;
+      box-shadow: 0 0 20px #7B2FBE, inset 0 0 20px rgba(123,47,190,0.1);
+      padding: 30px 36px; width: 700px; max-height: 88vh;
+      overflow-y: auto; font-family: 'Courier New', Courier, monospace;
+      opacity: 0; transform: translateY(18px);
+      transition: opacity 0.22s ease, transform 0.22s ease;
+    }
+    #hero-detail-panel.visible { opacity: 1; transform: translateY(0); }
+    #hero-detail-panel.hiding {
+      opacity: 0; transform: translateY(-12px);
+      transition: opacity 0.16s ease, transform 0.16s ease;
+    }
+    .detail-label { color: #E8D5FF; }
+    .detail-value { color: #FFFFFF; }
+    /* ── DEBUG TOAST ────────────────────────────────────── */
+    #debug-toast {
+      position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+      color: #00FFFF; font-family: 'Courier New', Courier, monospace;
+      font-size: 13px; letter-spacing: 2px; z-index: 9999;
+      pointer-events: none; opacity: 0; transition: opacity 0.3s ease;
+    }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+
+<div id="ui-layer">
+
+  <!-- BOOT SCREEN -->
+  <div id="boot-ui">
+    <div id="boot-border"></div>
+    <div id="boot-title">Pick Me Up</div>
+    <div id="boot-subtitle">· INFINITE GACHA · O N L I N E ·</div>
+    <hr id="boot-rule" />
+    <div id="boot-status"></div>
+    <div id="boot-bar-wrap"><div id="boot-bar-fill"></div></div>
+    <div id="boot-fade"></div>
+  </div>
+
+  <!-- POPUP CONTAINER -->
+  <div id="popup-container"></div>
+
+  <!-- HUB UI -->
+  <div id="hub-ui">
+    <div id="hub-topbar">
+      <div id="hub-topbar-left">PICK ME UP</div>
+      <div id="hub-topbar-right"></div>
+    </div>
+    <div id="hub-sidebar">
+      <button class="hub-nav-btn" onclick="hubNav('Tower')">[ Tower ]</button>
+      <button class="hub-nav-btn" onclick="hubNav('Dungeons')">[ Dungeons ]</button>
+      <button class="hub-nav-btn" onclick="hubNav('Heroes')">[ Heroes ]</button>
+      <button class="hub-nav-btn" onclick="hubNav('Summon')">[ Summon ]</button>
+      <button class="hub-nav-btn" onclick="hubNav('Synthesis')">[ Synthesis ]</button>
+      <button class="hub-nav-btn" onclick="hubNav('Shop')">[ Shop ]</button>
+    </div>
+    <div id="hub-main">
+      <div id="hub-main-placeholder" style="color:#C0C0D0;font-size:16px;letter-spacing:2px">[ Select a menu ]</div>
+    </div>
+    <div id="hub-bottombar">
+      <div id="hub-gems">Gems: 0</div>
+    </div>
+  </div>
+
+  <!-- TUTORIAL UI -->
+  <div id="tutorial-ui">
+    <div id="tutorial-text" style="color:#C0C0D0;font-size:16px;letter-spacing:2px;font-family:'Courier New',monospace">[ Tutorial — Coming Soon ]</div>
+    <button class="popup-btn" onclick="showHub()">[ SKIP ]</button>
+  </div>
+
+  <!-- PULL ANIMATION OVERLAY -->
+  <div id="pull-anim-overlay">
+    <div id="pull-flash"></div>
+    <div id="pull-shake-container">
+      <div id="pull-cards-area"></div>
+      <div id="pull-tap-prompt" style="display:none">[ TAP TO CONTINUE ]</div>
+    </div>
+  </div>
+
+  <!-- HERO DETAIL OVERLAY -->
+  <div id="hero-detail-overlay">
+    <div id="hero-detail-panel"></div>
+  </div>
+
+  <!-- DEBUG TOAST -->
+  <div id="debug-toast"></div>
+
+  <!-- RESULTS OVERLAY -->
+  <div id="results-overlay">
+    <div id="results-panel">
+      <div id="results-header">[SUMMON RESULTS]</div>
+      <div id="results-list"></div>
+      <div id="results-btn-row">
+        <button class="popup-btn" id="res-add-btn">[ ADD TO INVENTORY ]</button>
+        <button class="popup-btn" id="res-again-btn">[ SUMMON AGAIN ]</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// GAME STATE
+// ═══════════════════════════════════════════════════════════
+const gameState = {
+  playerNickname: "",
+  tutorialAccepted: false,
+  gems: 0,
+  currentFloor: 1,
+  inventory: [],
+  banners: {
+    standard: { pityCount: 0 },
+    limited:  { pityCount: 0 },
+    weapon:   { pityCount: 0 },
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// LOCALSTORAGE
+// ═══════════════════════════════════════════════════════════
+function saveToLocalStorage() {
+  localStorage.setItem('pickmeup_save', JSON.stringify({
+    playerNickname: gameState.playerNickname,
+    tutorialAccepted: gameState.tutorialAccepted,
+    gems: gameState.gems,
+    currentFloor: gameState.currentFloor,
+    inventory: gameState.inventory,
+    banners: gameState.banners,
+  }));
+}
+
+function loadFromLocalStorage() {
+  const raw = localStorage.getItem('pickmeup_save');
+  if (!raw) return false;
+  try {
+    const d = JSON.parse(raw);
+    if (d.playerNickname && /^[A-Za-z0-9]{2,6}$/.test(d.playerNickname)) {
+      gameState.playerNickname = d.playerNickname;
+      gameState.tutorialAccepted = !!d.tutorialAccepted;
+      gameState.gems = typeof d.gems === 'number' ? d.gems : 0;
+      gameState.currentFloor = d.currentFloor || 1;
+      gameState.inventory = Array.isArray(d.inventory) ? d.inventory : [];
+      if (d.banners) {
+        ['standard','limited','weapon'].forEach(k => {
+          if (d.banners[k]) gameState.banners[k] = { pityCount: d.banners[k].pityCount || 0 };
+        });
+      }
+      migrateInventory(); // retroactively apply talent/stats to older heroes
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+// Retroactively apply talent + full stats to any heroes loaded from old saves
+function migrateInventory() {
+  let changed = false;
+  gameState.inventory.forEach(item => {
+    if (item.type !== 'hero') return;
+    if (typeof item.talent === 'undefined') {
+      item.talent = generateTalent(item.rarity);
+      changed = true;
+    }
+    if (!item.stats) {
+      item.stats = buildHeroStats(item.rarity, item.talent);
+      changed = true;
+    }
+    if (typeof item.equippedWeapon === 'undefined') { item.equippedWeapon = null; changed = true; }
+    if (typeof item.inParty        === 'undefined') { item.inParty = false;        changed = true; }
+  });
+  if (changed) saveToLocalStorage();
+}
+
+// ═══════════════════════════════════════════════════════════
+// CANVAS SETUP
+// ═══════════════════════════════════════════════════════════
+const canvas = document.getElementById('gameCanvas');
+canvas.width = 1280; canvas.height = 720;
+canvas.style.width = '100vw'; canvas.style.height = '100vh';
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+function drawBackground(showGrid) {
+  ctx.fillStyle = '#0D0010';
+  ctx.fillRect(0, 0, 1280, 720);
+  if (showGrid) {
+    ctx.strokeStyle = '#1A0025'; ctx.lineWidth = 1;
+    for (let x = 0; x < 1280; x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,720); ctx.stroke(); }
+    for (let y = 0; y < 720; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(1280,y); ctx.stroke(); }
+  }
+}
+drawBackground(false);
+
+// ═══════════════════════════════════════════════════════════
+// POPUP SYSTEM
+// ═══════════════════════════════════════════════════════════
+const popupContainer = document.getElementById('popup-container');
+
+function createPopup(id) {
+  const overlay = document.createElement('div');
+  overlay.className = 'popup-overlay'; overlay.id = id + '-overlay';
+  const panel = document.createElement('div');
+  panel.className = 'popup-panel'; panel.id = id + '-panel';
+  overlay.appendChild(panel);
+  popupContainer.appendChild(overlay);
+  requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.add('visible')));
+  return panel;
+}
+
+function destroyPopup(id, callback) {
+  const overlay = document.getElementById(id + '-overlay');
+  const panel   = document.getElementById(id + '-panel');
+  if (!overlay) { if (callback) callback(); return; }
+  panel.classList.remove('visible'); panel.classList.add('hiding');
+  setTimeout(() => { overlay.remove(); if (callback) callback(); }, 180);
+}
+
+// ═══════════════════════════════════════════════════════════
+// TYPEWRITER
+// ═══════════════════════════════════════════════════════════
+function typewriter(el, text, speed, onDone, skipFlag) {
+  let i = 0, done = false;
+  el.textContent = '';
+  function tick() {
+    if (done) return;
+    if (skipFlag && skipFlag.value) {
+      el.textContent = text; done = true; if (onDone) onDone(); return;
+    }
+    if (i < text.length) { el.textContent += text[i++]; setTimeout(tick, speed); }
+    else { done = true; if (onDone) onDone(); }
+  }
+  setTimeout(tick, speed);
+  return { skip: () => { if (!done) skipFlag.value = true; } };
+}
+
+// ═══════════════════════════════════════════════════════════
+// BOOT SCREEN
+// ═══════════════════════════════════════════════════════════
+function runBootScreen(onComplete) {
+  const bootUI   = document.getElementById('boot-ui');
+  const title    = document.getElementById('boot-title');
+  const subtitle = document.getElementById('boot-subtitle');
+  const rule     = document.getElementById('boot-rule');
+  const statusEl = document.getElementById('boot-status');
+  const barWrap  = document.getElementById('boot-bar-wrap');
+  const barFill  = document.getElementById('boot-bar-fill');
+  const fadeDrop = document.getElementById('boot-fade');
+  bootUI.style.display = 'flex';
+
+  setTimeout(() => title.style.opacity = '1', 200);
+  setTimeout(() => subtitle.style.opacity = '1', 700);
+  setTimeout(() => rule.style.opacity = '1', 1000);
+
+  const statusText = "System Online  ·  Server: NEXUS-01  ·  Build 0.1.0";
+  let si = 0;
+  setTimeout(() => {
+    function tickS() {
+      if (si < statusText.length) { statusEl.textContent += statusText[si++]; setTimeout(tickS, 34); }
+      else startBar();
+    }
+    tickS();
+  }, 1200);
+
+  function startBar() {
+    barWrap.style.opacity = '1';
+    let p = 0;
+    const timer = setInterval(() => {
+      p = Math.min(100, p + 100 / (1200 / 30));
+      barFill.style.width = p + '%';
+      if (p >= 100) { clearInterval(timer); setTimeout(fadeOutBoot, 400); }
+    }, 30);
+  }
+  function fadeOutBoot() {
+    fadeDrop.style.opacity = '1';
+    setTimeout(() => { bootUI.style.display = 'none'; fadeDrop.style.opacity = '0'; onComplete(); }, 500);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// SCENE 2 — NICKNAME
+// ═══════════════════════════════════════════════════════════
+function showNicknamePopup(onComplete) {
+  const panel = createPopup('nick');
+  const skipFlag = { value: false };
+  panel.innerHTML = `
+    <div class="popup-header">[SYSTEM NOTICE]</div>
+    <div class="popup-body" id="nick-body"></div>
+    <div class="popup-input-wrap" id="nick-input-wrap" style="display:none">
+      <input class="popup-input" id="nick-input" type="text" maxlength="6" placeholder="Enter nickname..." autocomplete="off" />
+      <div class="popup-error" id="nick-error"></div>
+      <div class="popup-btn-row">
+        <button class="popup-btn" id="nick-confirm-btn" disabled>[CONFIRM]</button>
+      </div>
+    </div>`;
+  const overlay = document.getElementById('nick-overlay');
+  overlay.addEventListener('click', e => { if (e.target===overlay||e.target===panel) skipFlag.value=true; });
+  const bodyEl = document.getElementById('nick-body');
+  const text = "[Please register your name, Master.]\n(2–6 characters. No spaces or special characters.)";
+  let setupDone = false;
+
+  function doSetup() {
+    if (setupDone) return; setupDone = true;
+    const input      = document.getElementById('nick-input');
+    const confirmBtn = document.getElementById('nick-confirm-btn');
+    const errorEl    = document.getElementById('nick-error');
+    document.getElementById('nick-input-wrap').style.display = 'block';
+    const re = /^[A-Za-z0-9]{2,6}$/;
+    input.addEventListener('input', () => {
+      const v = input.value;
+      if (re.test(v)) { confirmBtn.disabled=false; errorEl.textContent=''; }
+      else { confirmBtn.disabled=true; errorEl.textContent = v.length>0 ? '✗ 2–6 alphanumeric characters only.' : ''; }
+    });
+    confirmBtn.addEventListener('click', () => {
+      if (confirmBtn.disabled) return;
+      const v = input.value.trim();
+      if (!re.test(v)) return;
+      gameState.playerNickname = v;
+      destroyPopup('nick', onComplete);
+    });
+    input.focus();
+  }
+
+  typewriter(bodyEl, text, 34, () => {
+    requestAnimationFrame(() => requestAnimationFrame(doSetup));
+  }, skipFlag);
+
+  const checkSkip = setInterval(() => {
+    if (skipFlag.value) { clearInterval(checkSkip); requestAnimationFrame(() => requestAnimationFrame(doSetup)); }
+  }, 50);
+}
+
+// ═══════════════════════════════════════════════════════════
+// SCENE 3 — WELCOME
+// ═══════════════════════════════════════════════════════════
+function showWelcomePopup(onComplete) {
+  const panel = createPopup('welcome');
+  const skipFlag = { value: false };
+  panel.innerHTML = `
+    <div class="popup-header">[SYSTEM NOTICE]</div>
+    <div class="popup-body" id="welcome-body-a"></div>
+    <div class="popup-body" id="welcome-body-b" style="margin-top:6px"></div>
+    <div class="popup-btn-row" id="welcome-btn-row" style="display:none">
+      <button class="popup-btn" id="welcome-ok-btn" disabled>[OK]</button>
+    </div>`;
+  const overlay = document.getElementById('welcome-overlay');
+  overlay.addEventListener('click', e => { if (e.target===overlay||e.target===panel) skipFlag.value=true; });
+  const bodyA = document.getElementById('welcome-body-a');
+  const bodyB = document.getElementById('welcome-body-b');
+  const btnRow = document.getElementById('welcome-btn-row');
+  const okBtn  = document.getElementById('welcome-ok-btn');
+  const textA  = `[Nickname confirmed.]\n\nWelcome, ${gameState.playerNickname}, to the world of Pick Me Up!\n\nInitializing session data...\nConnecting to server...`;
+
+  typewriter(bodyA, textA, 34, () => {
+    const cursor = document.createElement('span');
+    cursor.className = 'popup-cursor'; cursor.textContent = '▌';
+    bodyA.appendChild(cursor);
+    setTimeout(() => {
+      cursor.remove();
+      typewriter(bodyB, '[Connection established.]', 34, () => {
+        setTimeout(() => {
+          btnRow.style.display = 'flex';
+          requestAnimationFrame(() => requestAnimationFrame(() => okBtn.disabled = false));
+        }, 500);
+      }, skipFlag);
+    }, 1500);
+  }, skipFlag);
+
+  okBtn.addEventListener('click', () => { if (!okBtn.disabled) destroyPopup('welcome', onComplete); });
+}
+
+// ═══════════════════════════════════════════════════════════
+// SCENE 4 — TUTORIAL PROMPT
+// ═══════════════════════════════════════════════════════════
+function showTutorialPrompt(onYes, onNo) {
+  const panel = createPopup('tprompt');
+  const skipFlag = { value: false };
+  panel.innerHTML = `
+    <div class="popup-header">[SYSTEM NOTICE]</div>
+    <div class="popup-body" id="tp-body"></div>
+    <div class="popup-btn-row" id="tp-btn-row" style="display:none">
+      <button class="popup-btn yes-btn" id="tp-yes" disabled>[YES]</button>
+      <button class="popup-btn" id="tp-no" disabled>[NO]</button>
+    </div>`;
+  const overlay = document.getElementById('tprompt-overlay');
+  overlay.addEventListener('click', e => { if (e.target===overlay||e.target===panel) skipFlag.value=true; });
+  const bodyEl = document.getElementById('tp-body');
+  const btnRow = document.getElementById('tp-btn-row');
+  const yesBtn = document.getElementById('tp-yes');
+  const noBtn  = document.getElementById('tp-no');
+  typewriter(bodyEl, "[Would you like to proceed with the tutorial?]\n\nCompletion will reward you with a special gift.", 34, () => {
+    btnRow.style.display = 'flex';
+    requestAnimationFrame(() => requestAnimationFrame(() => { yesBtn.disabled=false; noBtn.disabled=false; }));
+  }, skipFlag);
+  yesBtn.addEventListener('click', () => {
+    if (yesBtn.disabled) return;
+    gameState.tutorialAccepted = true; saveToLocalStorage();
+    destroyPopup('tprompt', onYes);
+  });
+  noBtn.addEventListener('click', () => {
+    if (noBtn.disabled) return;
+    gameState.tutorialAccepted = false; saveToLocalStorage();
+    destroyPopup('tprompt', onNo);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// SCENE 5 — HUB
+// ═══════════════════════════════════════════════════════════
+function showHub() {
+  document.getElementById('tutorial-ui').style.display = 'none';
+  drawBackground(true);
+  const hubUI = document.getElementById('hub-ui');
+  hubUI.style.display = 'block';
+  document.getElementById('hub-topbar-right').textContent = `Master: ${gameState.playerNickname}`;
+  updateGemsDisplay();
+  resetHubMain();
+}
+
+function resetHubMain() {
+  const main = document.getElementById('hub-main');
+  main.style.alignItems = 'center';
+  main.style.justifyContent = 'center';
+  main.style.overflowY = '';
+  main.innerHTML = '<div style="color:#C0C0D0;font-size:16px;letter-spacing:2px">[ Select a menu ]</div>';
+  document.querySelectorAll('.hub-nav-btn').forEach(b => b.classList.remove('active'));
+}
+
+function hubNav(name) {
+  document.querySelectorAll('.hub-nav-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.includes(name));
+  });
+  currentScene = name;
+  if (name === 'Summon') {
+    showSummonScene();
+  } else if (name === 'Heroes') {
+    showHeroesScene();
+  } else {
+    resetHubMain();
+    console.log('Hub nav:', name);
+  }
+}
+
+function updateGemsDisplay() {
+  const el = document.getElementById('hub-gems');
+  if (el) el.textContent = `Gems: ${gameState.gems}`;
+}
+
+// Hidden gem refill: click hub-gems 5× within 2s
+(function setupGemsClick() {
+  let count = 0, timer = null;
+  document.addEventListener('click', e => {
+    if (!e.target || e.target.id !== 'hub-gems') return;
+    count++;
+    clearTimeout(timer);
+    timer = setTimeout(() => count = 0, 2000);
+    if (count >= 5) {
+      count = 0;
+      gameState.gems += 15000;
+      updateGemsDisplay();
+      saveToLocalStorage();
+      const el = document.getElementById('hub-gems');
+      if (el) { el.style.color = '#FFD700'; setTimeout(() => el.style.color = '', 800); }
+    }
+  });
+})();
+
+// ═══════════════════════════════════════════════════════════
+// SCENE 6 — TUTORIAL PLACEHOLDER
+// ═══════════════════════════════════════════════════════════
+function showTutorialScene() {
+  drawBackground(true);
+  document.getElementById('tutorial-ui').style.display = 'flex';
+}
+
+// ═══════════════════════════════════════════════════════════
+// ──────────────── GACHA ENGINE ─────────────────────────────
+// ═══════════════════════════════════════════════════════════
+
+const BASE_RATES = [30, 25, 22, 15, 6, 1.5, 0.5]; // index 0 = 1★
+
+const BANNER_DATA = {
+  standard: { title: 'Standard Summon',           subtitle: 'A world full of heroes awaits.',  featuredUnit: null },
+  limited:  { title: 'Limited: Shay Lathasterie', subtitle: 'The Silver Knight descends.',     featuredUnit: { name: 'Shay Lathasterie', rarity: 5, class: 'Knight' } },
+  weapon:   { title: 'Weapon Summon',              subtitle: 'Forge your legend.',              featuredUnit: null },
+};
+
+const RARITY_COLORS = {
+  1: '#888888', 2: '#BBBBBB', 3: '#4488FF',
+  4: '#BB44FF', 5: '#FFD700', 6: '#FFA500', 7: '#FF6020'
+};
+const RARITY_FLASH = {
+  1: 'rgba(180,180,180,0.28)', 2: 'rgba(220,220,220,0.33)',
+  3: 'rgba(68,136,255,0.50)',  4: 'rgba(160,60,255,0.50)',
+  5: 'rgba(255,210,0,0.62)',   6: 'rgba(255,160,0,0.72)',
+  7: 'rgba(255,255,255,0.92)'
+};
+const RARITY_CARD_BG = {
+  1: '#1A1A2E', 2: '#1C221C', 3: '#0B1840',
+  4: '#1A0D33', 5: '#291800', 6: '#200E00', 7: '#180000'
+};
+
+// Rarity border colors for hero roster cards (distinct from gacha flash colors)
+const RARITY_BORDER = {
+  1: '#888899', 2: '#4CAF50', 3: '#4A90D9',
+  4: '#9B59B6', 5: '#F1C40F', 6: '#E67E22', 7: '#FF6020'
+};
+
+// Base stats at level 1, indexed by rarity
+const BASE_STATS = {
+  1: { str:  8, int:  8, hp:  80, agi:  8 },
+  2: { str: 12, int: 12, hp: 120, agi: 12 },
+  3: { str: 18, int: 18, hp: 180, agi: 18 },
+  4: { str: 26, int: 26, hp: 260, agi: 26 },
+  5: { str: 36, int: 36, hp: 360, agi: 36 },
+  6: { str: 50, int: 50, hp: 500, agi: 50 },
+  7: { str: 70, int: 70, hp: 700, agi: 70 },
+};
+
+// Talent generation ranges per rarity: [{ p, min, max }, ...]
+const TALENT_RANGES = {
+  1: [{p:0.70,min:0.0,max:2.0},{p:0.28,min:2.1,max:4.0}, {p:0.02,min:4.1,max:10.0}],
+  2: [{p:0.65,min:0.0,max:2.0},{p:0.30,min:2.1,max:4.0}, {p:0.05,min:4.1,max:10.0}],
+  3: [{p:0.55,min:0.0,max:2.0},{p:0.35,min:2.1,max:4.0}, {p:0.10,min:4.1,max:10.0}],
+  4: [{p:0.45,min:0.0,max:2.0},{p:0.35,min:2.1,max:5.0}, {p:0.20,min:5.1,max:10.0}],
+  5: [{p:0.30,min:0.0,max:2.0},{p:0.35,min:2.1,max:6.0}, {p:0.35,min:6.1,max:10.0}],
+  6: [{p:0.20,min:0.0,max:2.0},{p:0.30,min:2.1,max:7.0}, {p:0.50,min:7.1,max:10.0}],
+  7: [{p:0.10,min:0.0,max:2.0},{p:0.20,min:2.1,max:7.0}, {p:0.70,min:7.1,max:10.0}],
+};
+
+const HERO_CLASSES   = ['Knight','Mage','Rogue','Archer','Healer','Berserker','Summoner'];
+const WEAPON_TYPES   = ['Sword','Staff','Dagger','Bow','Axe','Spear','Tome'];
+const pullCounters   = {};
+
+// ─── DEBUG & SCENE STATE ──────────────────────────────────
+let debugMode    = true;   // toggled by Ctrl+Shift+D
+let currentScene = '';     // tracks active hub scene for live debug refresh
+
+// ─── TALENT HELPERS ───────────────────────────────────────
+function generateTalent(rarity) {
+  const tiers = TALENT_RANGES[rarity] || TALENT_RANGES[1];
+  const rand   = Math.random();
+  let cum = 0;
+  for (const t of tiers) {
+    cum += t.p;
+    if (rand < cum) return Math.round((t.min + Math.random() * (t.max - t.min)) * 10) / 10;
+  }
+  return 0.0;
+}
+
+function buildHeroStats(rarity, talent) {
+  const b = BASE_STATS[rarity] || BASE_STATS[1];
+  return {
+    strength:     b.str,
+    intelligence: b.int,
+    health:       b.hp,
+    agility:      b.agi,
+    critRate:     Math.round((2 + talent * 1.5) * 10) / 10,
+    critDamage:   Math.round((120 + talent * 8)  * 10) / 10,
+    reactionTime: Math.round((1.0 - talent * 0.07) * 100) / 100,
+    // Synthesis note: talent acts as quality multiplier when hero is BASE in synthesis
+  };
+}
+
+function talentColor(t) {
+  if (t < 3.0) return '#FF4444';
+  if (t < 6.0) return '#FFD700';
+  if (t < 9.0) return '#90EE90';
+  return '#00FFFF';
+}
+
+function talentTierLabel(t) {
+  if (t < 3.0) return 'WEAK';
+  if (t < 6.0) return 'AVERAGE';
+  if (t < 9.0) return 'STRONG';
+  return 'EXCEPTIONAL';
+}
+
+function getCeiling(floor) {
+  if (floor <= 10)  return 4;
+  if (floor <= 30)  return 5;
+  if (floor <= 50)  return 6;
+  return 7;
+}
+
+/**
+ * Compute adjusted rates for a given floor + banner type.
+ * Returns an array of 7 percentages summing to ~100.
+ */
+function computeRates(floor, bannerKey) {
+  let r = [...BASE_RATES];
+
+  // Weapon banner: +1% each for 5/6/7★, taken from 1/2/3★ proportionally
+  if (bannerKey === 'weapon') {
+    const bonus = 3;
+    const lowerSum = r[0] + r[1] + r[2];
+    for (let i = 0; i < 3; i++) r[i] -= bonus * (r[i] / lowerSum);
+    r[4] += 1; r[5] += 1; r[6] += 1;
+  }
+
+  const ceiling = getCeiling(floor);
+
+  // Zero out above ceiling; collect excess
+  let pool = 0;
+  for (let i = ceiling; i < 7; i++) { pool += r[i]; r[i] = 0; }
+
+  // Apply soft-floor caps for 1★/2★ on high floors; collect excess
+  const caps = [Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity];
+  if (floor >= 31 && floor <= 50) { caps[0] = 3; caps[1] = 3; }
+  if (floor >= 51)                { caps[0] = 1; caps[1] = 1; }
+
+  for (let i = 0; i < ceiling; i++) {
+    if (r[i] > caps[i]) { pool += r[i] - caps[i]; r[i] = caps[i]; }
+  }
+
+  // Redistribute pool proportionally to uncapped, non-zero tiers below ceiling
+  if (pool > 0) {
+    let eligSum = 0;
+    for (let i = 0; i < ceiling; i++) if (r[i] > 0 && r[i] < caps[i]) eligSum += r[i];
+    if (eligSum > 0) {
+      for (let i = 0; i < ceiling; i++) {
+        if (r[i] > 0 && r[i] < caps[i]) r[i] += pool * (r[i] / eligSum);
+      }
+    }
+  }
+
+  return r;
+}
+
+/**
+ * Apply pity modifier to rates array.
+ * Mutates a copy. Soft pity: +3% to ceiling rarity per pull ≥45.
+ * Hard pity at pull 60 → 100% ceiling.
+ */
+function applyPity(rates, pityCount, ceiling) {
+  const r = [...rates];
+  const cidx = ceiling - 1;
+
+  if (pityCount >= 60) {
+    const out = Array(7).fill(0);
+    out[cidx] = 100;
+    return out;
+  }
+  if (pityCount >= 45) {
+    const bonus = Math.min((pityCount - 44) * 3, 100 - r[cidx]);
+    // Take from lower tiers proportionally
+    const lowerSum = r.slice(0, cidx).reduce((a,b)=>a+b, 0);
+    if (lowerSum > 0) {
+      for (let i = 0; i < cidx; i++) r[i] = Math.max(0, r[i] - bonus * (r[i] / lowerSum));
+    }
+    r[cidx] = Math.min(100, r[cidx] + bonus);
+  }
+  return r;
+}
+
+function rollRarity(rates) {
+  let rand = Math.random() * 100, cum = 0;
+  for (let i = 0; i < rates.length; i++) {
+    cum += rates[i];
+    if (rand < cum) return i + 1;
+  }
+  return 1;
+}
+
+function generateResult(bannerKey, rarity) {
+  const key = `${bannerKey}_${rarity}`;
+  pullCounters[key] = (pullCounters[key] || 0) + 1;
+  const num = String(pullCounters[key]).padStart(3, '0');
+  const uid = `${bannerKey}_${rarity}_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+
+  if (bannerKey === 'weapon') {
+    const wt = WEAPON_TYPES[Math.floor(Math.random() * WEAPON_TYPES.length)];
+    return { id: uid, type: 'weapon', name: `Weapon_${rarity}★_${num}`, rarity, weaponType: wt, isNew: true };
+  }
+
+  const cls     = HERO_CLASSES[Math.floor(Math.random() * HERO_CLASSES.length)];
+  const floor   = gameState.currentFloor;
+  const ceiling = getCeiling(floor);
+  let name      = `Hero_${rarity}★_${num}`;
+
+  // Limited 50/50
+  if (bannerKey === 'limited' && rarity === ceiling) {
+    const fu = BANNER_DATA.limited.featuredUnit;
+    if (fu && Math.random() < 0.5) name = fu.name;
+  }
+
+  const talent = generateTalent(rarity);
+  const stats  = buildHeroStats(rarity, talent);
+  return {
+    id: uid, type: 'hero', name, rarity, class: cls,
+    level: 1, exp: 0, talent, stats,
+    equippedWeapon: null, inParty: false, skills: [], isNew: true,
+  };
+}
+
+function performPull(bannerKey, count) {
+  const floor   = gameState.currentFloor;
+  const ceiling = getCeiling(floor);
+  const bState  = gameState.banners[bannerKey];
+  const results = [];
+
+  for (let i = 0; i < count; i++) {
+    bState.pityCount++;
+    const baseRates  = computeRates(floor, bannerKey);
+    const adjRates   = applyPity(baseRates, bState.pityCount, ceiling);
+    let rarity       = rollRarity(adjRates);
+
+    // Hard pity override
+    if (bState.pityCount >= 60) rarity = ceiling;
+
+    // Reset pity on ceiling hit
+    if (rarity === ceiling) bState.pityCount = 0;
+
+    results.push(generateResult(bannerKey, rarity));
+  }
+
+  saveToLocalStorage();
+  return results;
+}
+
+// ═══════════════════════════════════════════════════════════
+// SUMMON SCENE UI
+// ═══════════════════════════════════════════════════════════
+let activeBanner = 'standard';
+
+function showSummonScene() {
+  const main = document.getElementById('hub-main');
+  main.style.alignItems = 'flex-start';
+  main.style.justifyContent = 'flex-start';
+  main.style.overflowY = 'auto';
+  main.innerHTML = `
+    <div id="summon-scene" style="width:100%;padding:28px 36px">
+      <div id="summon-tabs" style="display:flex;border-bottom:2px solid #C0C0D0;margin-bottom:28px">
+        <button class="summon-tab" data-banner="standard">[ Standard ]</button>
+        <button class="summon-tab" data-banner="limited">[ Limited ]</button>
+        <button class="summon-tab" data-banner="weapon">[ Weapon ]</button>
+      </div>
+      <div id="summon-content"></div>
+    </div>`;
+
+  document.querySelectorAll('.summon-tab').forEach(t => {
+    t.addEventListener('click', () => { activeBanner = t.dataset.banner; refreshSummonContent(); });
+  });
+
+  refreshSummonContent();
+}
+
+function refreshSummonContent() {
+  // Update active tab styles
+  document.querySelectorAll('.summon-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.banner === activeBanner);
+  });
+
+  const floor    = gameState.currentFloor;
+  const ceiling  = getCeiling(floor);
+  const bData    = BANNER_DATA[activeBanner];
+  const bState   = gameState.banners[activeBanner];
+  const softPity = bState.pityCount >= 45;
+  const pityCol  = softPity ? '#FFD700' : '#C0C0D0';
+  const pityNote = softPity ? ' <span style="color:#FFD700;font-size:11px">(Soft Pity Active)</span>' : '';
+
+  const featuredHTML = activeBanner === 'limited' && bData.featuredUnit
+    ? `<div style="color:#C8C8E0;font-size:11px;margin-top:8px;border-top:1px solid #2A003A;padding-top:8px">
+         Featured: <span style="color:#FFD700">${bData.featuredUnit.name}</span>
+         &nbsp;·&nbsp; ${bData.featuredUnit.rarity}★ ${bData.featuredUnit.class}
+         &nbsp;·&nbsp; 50% on highest rarity roll
+       </div>` : '';
+
+  document.getElementById('summon-content').innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;gap:22px">
+
+      <div style="background:#12001A;border:2px solid #C0C0D0;box-shadow:0 0 15px #7B2FBE;padding:26px;width:440px">
+        <div style="color:#FFFFFF;font-size:17px;letter-spacing:2px;margin-bottom:6px">${bData.title}</div>
+        <div style="color:#E8D5FF;font-size:12px;margin-bottom:18px">${bData.subtitle}</div>
+        <div style="background:#080010;border:1px solid #2A003A;height:150px;display:flex;align-items:center;justify-content:center;margin-bottom:18px">
+          <span style="color:#1A0025;font-size:14px;letter-spacing:3px">[ Banner Art ]</span>
+        </div>
+        <div style="color:${pityCol};font-size:13px">Pity: ${bState.pityCount} / 60${pityNote}</div>
+        <div style="color:#888;font-size:11px;margin-top:4px">Floor bracket: ${floor<=10?'1–10 (max 4★)':floor<=30?'11–30 (max 5★)':floor<=50?'31–50 (max 6★)':'51–100 (all rarities)'}</div>
+        ${featuredHTML}
+      </div>
+
+      <div style="display:flex;gap:16px">
+        <button class="pull-btn" id="pull-1x-btn">[ SUMMON ×1 — 150 💎 ]</button>
+        <button class="pull-btn" id="pull-10x-btn">[ SUMMON ×10 — 1500 💎 ]</button>
+      </div>
+
+      <div style="color:#C0C0D0;font-size:13px" id="summon-gems-display">Gems: ${gameState.gems}</div>
+      <div id="pull-error-msg" style="color:#FF4444;font-size:12px;min-height:18px;letter-spacing:1px"></div>
+    </div>`;
+
+  document.getElementById('pull-1x-btn').addEventListener('click',  () => handlePull(1));
+  document.getElementById('pull-10x-btn').addEventListener('click', () => handlePull(10));
+}
+
+function handlePull(count) {
+  const cost    = count * 150;
+  const errEl   = document.getElementById('pull-error-msg');
+  if (gameState.gems < cost) {
+    if (errEl) { errEl.textContent = '[ Insufficient Gems ]'; setTimeout(() => { if (errEl) errEl.textContent=''; }, 3000); }
+    return;
+  }
+  gameState.gems -= cost;
+  updateGemsDisplay();
+  const gemDisp = document.getElementById('summon-gems-display');
+  if (gemDisp) gemDisp.textContent = `Gems: ${gameState.gems}`;
+
+  const results = performPull(activeBanner, count);
+  runPullAnimation(results, () => showResultsPanel(results));
+}
+
+// ═══════════════════════════════════════════════════════════
+// PULL ANIMATION
+// ═══════════════════════════════════════════════════════════
+function runPullAnimation(results, onComplete) {
+  const overlay   = document.getElementById('pull-anim-overlay');
+  const flash     = document.getElementById('pull-flash');
+  const cardsArea = document.getElementById('pull-cards-area');
+  const tapPrompt = document.getElementById('pull-tap-prompt');
+  const shakeEl   = document.getElementById('pull-shake-container');
+
+  cardsArea.innerHTML = '';
+  tapPrompt.style.display = 'none';
+  overlay.style.display = 'flex';
+
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    overlay.classList.add('visible');
+    setTimeout(() => {
+      if (results.length === 1) animSingle(results[0]);
+      else                      animMulti(results);
+    }, 300);
+  }));
+
+  function doFlash(rarity, cb) {
+    flash.style.background = RARITY_FLASH[rarity];
+    flash.style.opacity    = '1';
+    setTimeout(() => { flash.style.opacity = '0'; setTimeout(cb, 140); }, 140);
+  }
+
+  function doShake(rarity) {
+    if (rarity >= 6) { shakeEl.classList.add('shake-hard'); setTimeout(() => shakeEl.classList.remove('shake-hard'), 700); }
+    else if (rarity >= 5) { shakeEl.classList.add('shake'); setTimeout(() => shakeEl.classList.remove('shake'), 500); }
+  }
+
+  function showTap(clickCb) {
+    tapPrompt.style.display = 'block';
+    const handler = () => { overlay.removeEventListener('click', handler); clickCb(); };
+    overlay.addEventListener('click', handler);
+  }
+
+  function closeThenCallback() {
+    tapPrompt.style.display = 'none';
+    overlay.classList.remove('visible');
+    setTimeout(() => { overlay.style.display = 'none'; onComplete(); }, 320);
+  }
+
+  function makeCard(result, single) {
+    const card  = document.createElement('div');
+    card.className = 'pull-card' + (single ? ' single' : '');
+    const stars = '★'.repeat(result.rarity);
+    const col   = RARITY_COLORS[result.rarity];
+    const bg    = RARITY_CARD_BG[result.rarity];
+    const sub   = result.type === 'weapon' ? result.weaponType : result.class;
+    card.innerHTML = `
+      <div class="pull-card-face pull-card-back">
+        <div class="pull-card-back-symbol">✦</div>
+      </div>
+      <div class="pull-card-face pull-card-front" style="background:${bg};box-shadow:0 0 18px ${col}44">
+        <div class="pull-card-stars" style="color:${col}">${stars}</div>
+        <div class="pull-card-name">${result.name}</div>
+        <div class="pull-card-sub" style="color:${col}">${sub}</div>
+      </div>`;
+    return card;
+  }
+
+  function animSingle(result) {
+    const card = makeCard(result, true);
+    cardsArea.appendChild(card);
+    const hold = result.rarity === 7 ? 1500 : result.rarity >= 5 ? 700 : 200;
+    setTimeout(() => {
+      doFlash(result.rarity, () => {
+        doShake(result.rarity);
+        setTimeout(() => {
+          card.classList.add('flipped');
+          setTimeout(() => showTap(closeThenCallback), 650);
+        }, hold);
+      });
+    }, 150);
+  }
+
+  function animMulti(results) {
+    const cards = results.map(r => {
+      const c = makeCard(r, false);
+      cardsArea.appendChild(c);
+      return c;
+    });
+    let i = 0;
+    function next() {
+      if (i >= cards.length) { showTap(closeThenCallback); return; }
+      const r    = results[i];
+      const card = cards[i];
+      const hold = r.rarity >= 7 ? 500 : r.rarity >= 5 ? 250 : 0;
+      const gap  = r.rarity >= 5 ? 500 : 220;
+      setTimeout(() => {
+        doFlash(r.rarity, () => {
+          doShake(r.rarity);
+          card.classList.add('flipped');
+          i++;
+          setTimeout(next, gap);
+        });
+      }, hold);
+    }
+    setTimeout(next, 250);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// RESULTS PANEL
+// ═══════════════════════════════════════════════════════════
+let pendingResults = [];
+
+function showResultsPanel(results) {
+  pendingResults = results;
+  const overlay = document.getElementById('results-overlay');
+  const list    = document.getElementById('results-list');
+
+  list.innerHTML = results.map(r => {
+    const col   = RARITY_COLORS[r.rarity];
+    const stars = '★'.repeat(r.rarity);
+    const sub   = r.type === 'weapon' ? `[${r.weaponType}]` : `[${r.class}]`;
+    return `<div class="result-row">
+      <span class="result-stars" style="color:${col}">${stars}</span>
+      <span class="result-name">${r.name}</span>
+      <span class="result-sub">${sub}</span>
+    </div>`;
+  }).join('');
+
+  overlay.classList.add('visible');
+
+  const addBtn   = document.getElementById('res-add-btn');
+  const againBtn = document.getElementById('res-again-btn');
+
+  // Replace listeners cleanly
+  const newAdd = addBtn.cloneNode(true);
+  const newAgain = againBtn.cloneNode(true);
+  addBtn.replaceWith(newAdd);
+  againBtn.replaceWith(newAgain);
+
+  newAdd.addEventListener('click', () => {
+    pendingResults.forEach(r => gameState.inventory.push(r));
+    saveToLocalStorage();
+    pendingResults = [];
+    overlay.classList.remove('visible');
+  });
+
+  newAgain.addEventListener('click', () => {
+    overlay.classList.remove('visible');
+    refreshSummonContent();
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// ──────────────── HEROES SCENE ─────────────────────────────
+// ═══════════════════════════════════════════════════════════
+
+let heroSortMode = 'recent';
+
+function showHeroesScene() {
+  const main = document.getElementById('hub-main');
+  main.style.alignItems    = 'flex-start';
+  main.style.justifyContent = 'flex-start';
+  main.style.overflowY     = 'auto';
+  main.innerHTML = `
+    <div id="heroes-scene" style="width:100%;padding:28px 36px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:10px">
+        <div style="color:#FFFFFF;font-size:16px;letter-spacing:2px">[ HERO ROSTER ]</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="color:#E8D5FF;font-size:11px;margin-right:2px">Sort by:</span>
+          <button class="sort-btn" data-sort="rarity" onclick="setHeroSort('rarity')">[ Rarity ★ ]</button>
+          <button class="sort-btn" data-sort="level"  onclick="setHeroSort('level')">[ Level ]</button>
+          <button class="sort-btn" data-sort="name"   onclick="setHeroSort('name')">[ Name A–Z ]</button>
+          <button class="sort-btn" data-sort="recent" onclick="setHeroSort('recent')">[ Recent ]</button>
+        </div>
+      </div>
+      <div id="hero-grid"></div>
+    </div>`;
+  updateSortBtnState();
+  refreshHeroGrid();
+}
+
+function setHeroSort(mode) {
+  heroSortMode = mode;
+  updateSortBtnState();
+  refreshHeroGrid();
+}
+
+function updateSortBtnState() {
+  document.querySelectorAll('.sort-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.sort === heroSortMode);
+  });
+}
+
+function refreshHeroGrid() {
+  const grid = document.getElementById('hero-grid');
+  if (!grid) return;
+
+  const heroes = gameState.inventory.filter(i => i.type === 'hero');
+
+  if (heroes.length === 0) {
+    grid.style.display = 'block';
+    grid.innerHTML = `<div style="color:#C0C0D0;font-size:14px;letter-spacing:1px;text-align:center;margin-top:60px">[ No heroes summoned yet. Visit the Summon menu. ]</div>`;
+    return;
+  }
+
+  // Sort a copy — 'recent' is reverse-insertion (last in = first shown)
+  const sorted = [...heroes];
+  switch (heroSortMode) {
+    case 'rarity': sorted.sort((a,b) => b.rarity - a.rarity || heroes.indexOf(b) - heroes.indexOf(a)); break;
+    case 'level':  sorted.sort((a,b) => b.level - a.level   || b.rarity - a.rarity); break;
+    case 'name':   sorted.sort((a,b) => a.name.localeCompare(b.name)); break;
+    case 'recent': sorted.reverse(); break;
+  }
+
+  grid.style.display = '';
+  grid.innerHTML = '';
+
+  sorted.forEach(hero => {
+    const col = RARITY_BORDER[hero.rarity] || '#C0C0D0';
+    const stars = '★'.repeat(hero.rarity);
+    const is7   = hero.rarity === 7;
+
+    // Wrapper — gradient border for 7★, solid for others
+    const wrapper = document.createElement('div');
+    wrapper.className = 'hero-card';
+    wrapper.dataset.heroId = hero.id;
+
+    if (is7) {
+      wrapper.style.cssText += 'background:linear-gradient(135deg,#FF4500,#FFD700);padding:2px;';
+    } else {
+      wrapper.style.border = `2px solid ${col}`;
+    }
+
+    // Inner container (needed for 7★ gradient border trick)
+    const inner = document.createElement('div');
+    inner.style.cssText = is7
+      ? 'width:100%;height:100%;background:#12001A;position:relative;display:flex;flex-direction:column;'
+      : 'width:100%;height:100%;position:relative;display:flex;flex-direction:column;';
+
+    // Art area
+    const art = document.createElement('div');
+    art.className = 'hero-card-art';
+    art.style.borderBottomColor = is7 ? '#FF650044' : col + '44';
+    art.textContent = '[ Art ]';
+    inner.appendChild(art);
+
+    // Body
+    const body = document.createElement('div');
+    body.className = 'hero-card-body';
+    body.innerHTML = `
+      <div class="hero-card-name">${escHtml(hero.name)}</div>
+      <div class="hero-card-stars" style="color:${col}">${stars}</div>
+      <div class="hero-card-class">${escHtml(hero.class)}</div>
+      <div class="hero-card-level">Lv. ${hero.level}</div>`;
+    inner.appendChild(body);
+
+    // Badges
+    if (hero.isNew) {
+      const nb = document.createElement('div');
+      nb.className = 'hero-card-badge new'; nb.textContent = '[ NEW ]';
+      inner.appendChild(nb);
+    }
+    if (hero.inParty) {
+      const pb = document.createElement('div');
+      pb.className = 'hero-card-badge party'; pb.textContent = '[ PARTY ]';
+      inner.appendChild(pb);
+    }
+
+    // Debug talent badge
+    if (debugMode) {
+      const db = document.createElement('div');
+      db.className = 'hero-card-debug';
+      db.style.color = talentColor(hero.talent);
+      db.textContent = `T: ${hero.talent}`;
+      inner.appendChild(db);
+    }
+
+    wrapper.appendChild(inner);
+
+    // 7★ hover needs glow on wrapper
+    wrapper.addEventListener('mouseenter', () => { wrapper.style.boxShadow = '0 0 14px #7B2FBE'; });
+    wrapper.addEventListener('mouseleave', () => { wrapper.style.boxShadow = ''; });
+
+    wrapper.addEventListener('click', () => {
+      if (hero.isNew) {
+        hero.isNew = false;
+        saveToLocalStorage();
+        inner.querySelector('.hero-card-badge.new')?.remove();
+      }
+      openHeroDetail(hero);
+    });
+
+    grid.appendChild(wrapper);
+  });
+}
+
+// ─── HERO DETAIL PANEL ────────────────────────────────────
+function openHeroDetail(hero) {
+  const overlay = document.getElementById('hero-detail-overlay');
+  const panel   = document.getElementById('hero-detail-panel');
+  const col      = RARITY_BORDER[hero.rarity] || '#C0C0D0';
+  const stars    = '★'.repeat(hero.rarity);
+  const expNext  = hero.level * 100;
+  const wpnName  = hero.equippedWeapon ? escHtml(hero.equippedWeapon.name) : '— None —';
+  const partyStr = hero.inParty ? 'In Party' : 'Not in Party';
+
+  const debugHTML = debugMode ? `
+    <div style="margin-top:22px;padding-top:16px;border-top:1px solid #00FFFF33">
+      <div style="color:#00FFFF;font-size:12px;letter-spacing:2px;margin-bottom:12px">[ DEBUG ]</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px 28px;font-size:11px;font-family:'Courier New',monospace">
+        <div><span class="detail-label">Talent Score: </span>
+          <span style="color:${talentColor(hero.talent)}">${hero.talent} / 10</span></div>
+        <div><span class="detail-label">Talent Tier: </span>
+          <span style="color:${talentColor(hero.talent)}">${talentTierLabel(hero.talent)}</span></div>
+        <div style="grid-column:1/-1"><span class="detail-label">Crit Rate src: </span>
+          <span style="color:#00FFFF">2% + (${hero.talent} × 1.5%) = ${hero.stats.critRate}%</span></div>
+        <div style="grid-column:1/-1"><span class="detail-label">Crit DMG src: </span>
+          <span style="color:#00FFFF">120% + (${hero.talent} × 8%) = ${hero.stats.critDamage}%</span></div>
+        <div style="grid-column:1/-1"><span class="detail-label">Reaction src: </span>
+          <span style="color:#00FFFF">1.0s − (${hero.talent} × 0.07s) = ${hero.stats.reactionTime}s</span></div>
+        <div style="grid-column:1/-1"><span class="detail-label">Lvl Bonus/lvl: </span>
+          <span style="color:#00FFFF">+${Math.floor(hero.talent * 0.15)} per stat per level</span></div>
+      </div>
+    </div>` : '';
+
+  panel.innerHTML = `
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;gap:12px">
+      <div>
+        <div style="color:#FFFFFF;font-size:17px;font-weight:bold;letter-spacing:1px">${escHtml(hero.name)}</div>
+        <div style="color:${col};font-size:15px;margin-top:5px;letter-spacing:2px">${stars}</div>
+      </div>
+      <button id="hd-close-btn"
+        style="background:#1A0025;border:2px solid #C0C0D0;color:#FFFFFF;font-family:'Courier New',monospace;
+               font-size:12px;padding:7px 18px;cursor:pointer;letter-spacing:1px;white-space:nowrap;flex-shrink:0;
+               transition:box-shadow 0.2s"
+        onmouseover="this.style.boxShadow='0 0 10px #7B2FBE'"
+        onmouseout="this.style.boxShadow=''">[ × CLOSE ]</button>
+    </div>
+
+    <div style="background:#080010;border:1px solid #2A003A;height:180px;
+                display:flex;align-items:center;justify-content:center;margin-bottom:22px">
+      <span style="color:#1A0025;font-size:14px;letter-spacing:3px">[ Hero Art ]</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px 32px;font-size:12px;
+                font-family:'Courier New',monospace;margin-bottom:22px">
+      <div><span class="detail-label">Class: </span><span class="detail-value">${escHtml(hero.class)}</span></div>
+      <div><span class="detail-label">Crit Rate: </span><span class="detail-value">${hero.stats.critRate}%</span></div>
+      <div><span class="detail-label">Level: </span><span class="detail-value">${hero.level}
+        <span style="color:#666;font-size:10px">(EXP: ${hero.exp} / ${expNext})</span></span></div>
+      <div><span class="detail-label">Crit Damage: </span><span class="detail-value">${hero.stats.critDamage}%</span></div>
+      <div><span class="detail-label">Strength: </span><span class="detail-value">${hero.stats.strength}</span></div>
+      <div><span class="detail-label">Reaction: </span><span class="detail-value">${hero.stats.reactionTime}s</span></div>
+      <div><span class="detail-label">Intelligence: </span><span class="detail-value">${hero.stats.intelligence}</span></div>
+      <div><span class="detail-label">Weapon: </span><span class="detail-value">${wpnName}</span></div>
+      <div><span class="detail-label">Health: </span><span class="detail-value">${hero.stats.health}</span></div>
+      <div><span class="detail-label">Party: </span><span class="detail-value">${partyStr}</span></div>
+      <div><span class="detail-label">Agility: </span><span class="detail-value">${hero.stats.agility}</span></div>
+    </div>
+
+    <div style="border-top:1px solid #2A003A;padding-top:16px;font-family:'Courier New',monospace">
+      <div style="color:#C0C0D0;font-size:12px;letter-spacing:2px;margin-bottom:10px">Possessed Skills</div>
+      ${hero.skills && hero.skills.length > 0
+        ? hero.skills.map(s => `<div style="color:#FFFFFF;font-size:12px;padding:3px 0">${escHtml(s)}</div>`).join('')
+        : '<div style="color:#E8D5FF;font-size:12px">[ No skills unlocked ]</div>'}
+    </div>
+
+    ${debugHTML}`;
+
+  overlay.style.display = 'flex';
+  requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.add('visible')));
+
+  document.getElementById('hd-close-btn').addEventListener('click', closeHeroDetail);
+  overlay.addEventListener('click', function hdOutside(e) {
+    if (e.target === overlay) { closeHeroDetail(); overlay.removeEventListener('click', hdOutside); }
+  });
+}
+
+function closeHeroDetail() {
+  const overlay = document.getElementById('hero-detail-overlay');
+  const panel   = document.getElementById('hero-detail-panel');
+  panel.classList.remove('visible');
+  panel.classList.add('hiding');
+  setTimeout(() => {
+    overlay.style.display = 'none';
+    panel.classList.remove('hiding');
+  }, 180);
+}
+
+// ─── DEBUG MODE TOGGLE ─────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+    e.preventDefault();
+    debugMode = !debugMode;
+    // Flash toast
+    const toast = document.getElementById('debug-toast');
+    toast.textContent = debugMode ? '[ DEBUG MODE ON ]' : '[ DEBUG MODE OFF ]';
+    toast.style.opacity = '1';
+    setTimeout(() => { toast.style.opacity = '0'; }, 1500);
+    // Live refresh if heroes scene is open
+    if (currentScene === 'Heroes') refreshHeroGrid();
+    // Refresh hero detail if open
+    const overlay = document.getElementById('hero-detail-overlay');
+    if (overlay && overlay.style.display !== 'none') {
+      // Re-open with same hero — find it by checking panel content isn't needed,
+      // just close and let user reopen to see debug data
+    }
+  }
+});
+
+// Utility: escape HTML entities for safe innerHTML insertion
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ═══════════════════════════════════════════════════════════
+// INTRO FLOW
+// ═══════════════════════════════════════════════════════════
+function runIntroFlow() {
+  runBootScreen(() => {
+    showNicknamePopup(() => {
+      showWelcomePopup(() => {
+        showTutorialPrompt(
+          () => showTutorialScene(),
+          () => showHub()
+        );
+      });
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// ENTRY POINT
+// ═══════════════════════════════════════════════════════════
+(function init() {
+  if (loadFromLocalStorage()) {
+    document.getElementById('boot-ui').style.display = 'none';
+    showHub();
+  } else {
+    runIntroFlow();
+  }
+})();
+</script>
+</body>
+</html>

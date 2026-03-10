@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /home/tanshu/Desktop/codingstuff/personal_projects/PickMeUp3.0/pick-me-up && npx serve .)",
+      "Bash(gh auth:*)",
+      "Bash(git --version && git config --global user.name && git config --global user.email 2>&1)",
+      "Bash(git init:*)",
+      "Bash(git branch:*)"
+    ]
+  }
+}

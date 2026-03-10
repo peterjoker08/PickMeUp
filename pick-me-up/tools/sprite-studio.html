@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PickMeUp — Sprite Studio</title>
+<style>
+  :root {
+    --bg: #0D0010; --panel: #12001A; --border: #C0C0D0;
+    --muted: #B8A9D0; --gold: #FFD700; --red: #FF4444;
+    --green: #4CAF50; --purple: #7B2FBE;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: #fff;
+    font-family: 'Courier New', monospace; font-size: 13px;
+    display: flex; height: 100vh; overflow: hidden;
+  }
+
+  /* ─── LEFT PANEL: Character list ─── */
+  .sidebar {
+    width: 280px; min-width: 280px; background: var(--panel);
+    border-right: 1px solid #C0C0D022;
+    display: flex; flex-direction: column;
+  }
+  .sidebar-header {
+    padding: 14px 16px; border-bottom: 1px solid #C0C0D022;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .sidebar-title { color: var(--gold); font-size: 14px; letter-spacing: 2px; }
+  .sidebar-search {
+    background: var(--bg); border: 1px solid #C0C0D033; color: #fff;
+    font-family: inherit; font-size: 12px; padding: 6px 10px; width: 100%;
+    outline: none;
+  }
+  .sidebar-search:focus { border-color: var(--gold); }
+  .char-list {
+    flex: 1; overflow-y: auto; padding: 6px;
+  }
+  .char-item {
+    padding: 8px 10px; cursor: pointer; border: 1px solid transparent;
+    display: flex; align-items: center; gap: 10px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .char-item:hover { border-color: #C0C0D033; background: #ffffff06; }
+  .char-item.active { border-color: var(--gold); background: #FFD70008; }
+  .char-item-sprite {
+    width: 40px; height: 40px; image-rendering: pixelated;
+    background: var(--bg); border: 1px solid #C0C0D022; flex-shrink: 0;
+  }
+  .char-item-info { flex: 1; min-width: 0; }
+  .char-item-name { color: #fff; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .char-item-meta { color: var(--muted); font-size: 10px; }
+  .char-item-stars { font-size: 10px; letter-spacing: 1px; }
+
+  .sidebar-footer {
+    padding: 10px; border-top: 1px solid #C0C0D022;
+    display: flex; gap: 6px;
+  }
+
+  /* ─── MAIN: Editor ─── */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .main-header {
+    padding: 12px 20px; border-bottom: 1px solid #C0C0D022;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .main-header-title { color: var(--gold); font-size: 15px; letter-spacing: 2px; }
+  .main-body { flex: 1; overflow-y: auto; padding: 20px; display: flex; gap: 24px; }
+
+  /* ─── Sprite preview ─── */
+  .sprite-section { display: flex; flex-direction: column; align-items: center; gap: 12px; min-width: 200px; }
+  .sprite-canvas-wrap {
+    width: 192px; height: 192px; background: var(--bg);
+    border: 2px solid #C0C0D033; display: flex; align-items: center;
+    justify-content: center; position: relative; overflow: hidden;
+  }
+  .sprite-canvas-wrap canvas {
+    image-rendering: pixelated; width: 192px; height: 192px;
+  }
+  .sprite-full-sheet {
+    width: 192px; max-height: 120px; overflow: hidden; margin-top: 4px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg); border: 1px solid #C0C0D022;
+  }
+  .sprite-full-sheet img {
+    width: 192px; image-rendering: pixelated; opacity: 0.6;
+  }
+  .sprite-anim-btns { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
+  .sprite-anim-btn {
+    background: var(--bg); border: 1px solid #C0C0D033; color: var(--muted);
+    font-family: inherit; font-size: 9px; padding: 2px 6px; cursor: pointer;
+  }
+  .sprite-anim-btn.active { border-color: var(--gold); color: var(--gold); }
+
+  /* ─── Editor form ─── */
+  .editor { flex: 1; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .editor-row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .field { display: flex; flex-direction: column; gap: 3px; }
+  .field label { color: var(--muted); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+  .field input, .field select, .field textarea {
+    background: var(--bg); border: 1px solid #C0C0D033; color: #fff;
+    font-family: inherit; font-size: 12px; padding: 5px 8px; outline: none;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--gold); }
+  .field-sm { width: 80px; }
+  .field-md { width: 150px; }
+  .field-lg { width: 300px; }
+  .field-full { width: 100%; }
+  .field textarea { min-height: 48px; resize: vertical; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .stat-grid .field input { width: 100%; }
+
+  .tags-display { display: flex; gap: 4px; flex-wrap: wrap; }
+  .tag {
+    background: #7B2FBE22; border: 1px solid #7B2FBE44; color: var(--muted);
+    font-size: 10px; padding: 1px 6px; cursor: pointer;
+  }
+  .tag:hover { border-color: var(--red); }
+
+  /* ─── Layer Picker ─── */
+  .layer-section {
+    border-top: 1px solid #C0C0D022; padding-top: 14px; margin-top: 6px;
+  }
+  .layer-section-title { color: var(--gold); font-size: 12px; letter-spacing: 1px; margin-bottom: 10px; }
+  .layer-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 6px;
+  }
+  .layer-grid .field select { width: 100%; }
+
+  /* ─── Buttons ─── */
+  .btn {
+    background: var(--bg); border: 1px solid var(--border); color: #fff;
+    font-family: inherit; font-size: 12px; padding: 6px 14px; cursor: pointer;
+    letter-spacing: 1px; transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .btn:hover { border-color: var(--gold); box-shadow: 0 0 8px #FFD70022; }
+  .btn-gold { border-color: var(--gold); color: var(--gold); }
+  .btn-red { border-color: var(--red); color: var(--red); }
+  .btn-green { border-color: var(--green); color: var(--green); }
+  .btn-sm { font-size: 10px; padding: 4px 8px; }
+  .btn:disabled { opacity: 0.3; cursor: default; }
+
+  /* ─── Generate modal ─── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+    display: flex; align-items: center; justify-content: center; z-index: 1000;
+  }
+  .modal {
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 20px 24px; max-width: 500px; width: 90%;
+  }
+  .modal-title { color: var(--gold); font-size: 14px; letter-spacing: 2px; margin-bottom: 14px; }
+
+  .loading-dots::after {
+    content: ''; animation: dots 1.2s steps(3, end) infinite;
+  }
+  @keyframes dots {
+    0% { content: '.'; } 33% { content: '..'; } 66% { content: '...'; }
+  }
+
+  /* ─── Scrollbar ─── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #C0C0D033; }
+
+  .empty-state {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 12px; text-align: center; padding: 40px;
+  }
+
+  /* ─── Generate section ─── */
+  .gen-section { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+
+<!-- ═══ SIDEBAR ═══ -->
+<div class="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-title">[ SPRITE STUDIO ]</div>
+    <input class="sidebar-search" id="search" placeholder="Search characters..." />
+  </div>
+  <div class="char-list" id="charList"></div>
+  <div class="sidebar-footer">
+    <button class="btn btn-gold btn-sm" onclick="newCharacter()" style="flex:1">[ + New ]</button>
+    <button class="btn btn-sm" onclick="quickGenerate()" style="flex:1">[ ⚡ Quick Gen ]</button>
+  </div>
+</div>
+
+<!-- ═══ MAIN ═══ -->
+<div class="main">
+  <div class="main-header">
+    <div class="main-header-title" id="editorTitle">[ No Character Selected ]</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-green btn-sm" id="btnSave" onclick="saveCharacter()" disabled>[ Save ]</button>
+      <button class="btn btn-red btn-sm" id="btnDelete" onclick="deleteChar()" disabled>[ Delete ]</button>
+    </div>
+  </div>
+
+  <div class="main-body" id="mainBody">
+    <div class="empty-state" id="emptyState">
+      [ Select a character or create a new one ]<br><br>
+      You can also use [ ⚡ Quick Gen ] to generate a sprite<br>
+      from a free text description without saving.
+    </div>
+
+    <!-- Editor (hidden until a character is selected) -->
+    <div id="editorPanel" style="display:none;flex:1;display:none;">
+      <!-- Sprite preview -->
+      <div class="sprite-section" id="spriteSection">
+        <div class="sprite-canvas-wrap">
+          <canvas id="spriteCanvas" width="64" height="64"></canvas>
+        </div>
+        <div class="sprite-anim-btns" id="animBtns"></div>
+        <div class="sprite-full-sheet" id="fullSheet"></div>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <button class="btn btn-gold btn-sm" onclick="generateSprite()">[ 🎨 Generate ]</button>
+          <button class="btn btn-sm" onclick="downloadSprite()">[ ⬇ PNG ]</button>
+        </div>
+      </div>
+
+      <!-- Form -->
+      <div class="editor" id="editorForm">
+        <div class="editor-row">
+          <div class="field field-md">
+            <label>Name</label>
+            <input id="fName" placeholder="Character name" />
+          </div>
+          <div class="field field-sm">
+            <label>Level</label>
+            <input id="fLevel" type="number" min="1" value="1" />
+          </div>
+          <div class="field field-md">
+            <label>Class</label>
+            <input id="fClass" placeholder="e.g. Knight, Mage" />
+          </div>
+          <div class="field field-sm">
+            <label>Rarity (1-7)</label>
+            <input id="fRarity" type="number" min="1" max="7" value="1" />
+          </div>
+        </div>
+
+        <div class="field field-full">
+          <label>Description (for AI sprite generation)</label>
+          <textarea id="fDesc" placeholder="e.g. a young male knight with dark hair and plate armor"></textarea>
+        </div>
+
+        <div>
+          <label style="color:var(--muted);font-size:10px;letter-spacing:1px;text-transform:uppercase">Stats</label>
+          <div class="stat-grid" style="margin-top:4px">
+            <div class="field"><label>STR</label><input id="fStr" type="number" value="8" /></div>
+            <div class="field"><label>INT</label><input id="fInt" type="number" value="8" /></div>
+            <div class="field"><label>HP</label><input id="fHp" type="number" value="8" /></div>
+            <div class="field"><label>AGI</label><input id="fAgi" type="number" value="8" /></div>
+            <div class="field"><label>Crit Rate</label><input id="fCrit" type="number" step="0.1" value="5" /></div>
+            <div class="field"><label>Crit Dmg</label><input id="fCritDmg" type="number" value="130" /></div>
+          </div>
+        </div>
+
+        <div class="editor-row">
+          <div class="field field-full">
+            <label>Tags (comma-separated)</label>
+            <input id="fTags" placeholder="e.g. starter, tutorial, boss" />
+          </div>
+        </div>
+
+        <div class="field field-full">
+          <label>Notes</label>
+          <textarea id="fNotes" placeholder="Any notes about this character..."></textarea>
+        </div>
+
+        <!-- Layer overrides -->
+        <div class="layer-section">
+          <div class="layer-section-title">[ LPC Layer Overrides ] <span style="color:var(--muted);font-size:10px">(leave on 'auto' to let AI decide)</span></div>
+          <div class="layer-grid" id="layerGrid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:3777';
+
+let characters = [];
+let activeId = null;
+let spriteImage = null;  // currently loaded Image
+let animTimer = null;
+let currentAnim = 'idle';
+let lpcLayers = {};      // layer definitions from server
+
+// LPC Universal-Expanded animation map (same as spriteGen.js)
+// 832×2944 = 13 cols × 46 rows of 64×64 frames
+const LPC_ANIMS = {
+  // Spellcast (rows 0-3)
+  spellcast_up:{row:0,frames:7},spellcast_left:{row:1,frames:7},
+  spellcast_down:{row:2,frames:7},spellcast_right:{row:3,frames:7},
+  // Thrust (rows 4-7)
+  thrust_up:{row:4,frames:8},thrust_left:{row:5,frames:8},
+  thrust_down:{row:6,frames:8},thrust_right:{row:7,frames:8},
+  // Walk (rows 8-11)
+  walk_up:{row:8,frames:9},walk_left:{row:9,frames:9},
+  walk_down:{row:10,frames:9},walk_right:{row:11,frames:9},
+  // Slash (rows 12-15)
+  slash_up:{row:12,frames:6},slash_left:{row:13,frames:6},
+  slash_down:{row:14,frames:6},slash_right:{row:15,frames:6},
+  // Shoot (rows 16-19)
+  shoot_up:{row:16,frames:13},shoot_left:{row:17,frames:13},
+  shoot_down:{row:18,frames:13},shoot_right:{row:19,frames:13},
+  // Hurt & Climb (rows 20-21)
+  hurt:{row:20,frames:6},
+  climb:{row:21,frames:6},
+  // Idle (rows 22-25)
+  idle_up:{row:22,frames:2},idle_left:{row:23,frames:2},
+  idle_down:{row:24,frames:2},idle_right:{row:25,frames:2},
+  // Jump (rows 26-29)
+  jump_up:{row:26,frames:5},jump_left:{row:27,frames:5},
+  jump_down:{row:28,frames:5},jump_right:{row:29,frames:5},
+  // Sit (rows 30-33)
+  sit_up:{row:30,frames:3},sit_left:{row:31,frames:3},
+  sit_down:{row:32,frames:3},sit_right:{row:33,frames:3},
+  // Emote (rows 34-37)
+  emote_up:{row:34,frames:3},emote_left:{row:35,frames:3},
+  emote_down:{row:36,frames:3},emote_right:{row:37,frames:3},
+  // Run (rows 38-41)
+  run_up:{row:38,frames:8},run_left:{row:39,frames:8},
+  run_down:{row:40,frames:8},run_right:{row:41,frames:8},
+  // Combat Idle (rows 42-45)
+  combat_idle_up:{row:42,frames:2},combat_idle_left:{row:43,frames:2},
+  combat_idle_down:{row:44,frames:2},combat_idle_right:{row:45,frames:2},
+};
+const ALIASES = {
+  idle:'idle_down', walk:'walk_right', run:'run_right',
+  attack:'slash_right', cast:'spellcast_right', shoot:'shoot_right',
+  jump:'jump_down', sit:'sit_down', combat:'combat_idle_right',
+};
+
+// ─── Init ─────────────────────────────────────────────────
+async function init() {
+  await loadLPCLayers();
+  await loadCharacters();
+  buildLayerGrid();
+  buildAnimButtons();
+}
+
+async function loadLPCLayers() {
+  try {
+    const r = await fetch(API + '/lpc-layers');
+    lpcLayers = await r.json();
+  } catch { console.warn('Could not load LPC layers'); }
+}
+
+async function loadCharacters(searchQuery) {
+  try {
+    const url = searchQuery ? API + '/characters?q=' + encodeURIComponent(searchQuery) : API + '/characters';
+    const r = await fetch(url);
+    characters = await r.json();
+  } catch { characters = []; }
+  renderCharList();
+}
+
+// ─── Character List ───────────────────────────────────────
+function renderCharList() {
+  const list = document.getElementById('charList');
+  if (characters.length === 0) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:11px;text-align:center;padding:20px">[ No characters yet ]</div>';
+    return;
+  }
+  list.innerHTML = '';
+  characters.forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'char-item' + (c.id === activeId ? ' active' : '');
+    const stars = '★'.repeat(Math.min(c.rarity, 7));
+    const rarityColors = ['','#C0C0D0','#4CAF50','#2196F3','#9C27B0','#FF9800','#FF4444','#FFD700'];
+    const col = rarityColors[c.rarity] || '#C0C0D0';
+
+    let spriteHtml = '<div class="char-item-sprite" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:9px">[ ? ]</div>';
+    if (c.spriteId) {
+      spriteHtml = '<img class="char-item-sprite" src="' + API + '/sprite/' + c.spriteId + '" />';
+    }
+
+    el.innerHTML = spriteHtml +
+      '<div class="char-item-info">' +
+        '<div class="char-item-name">' + esc(c.name) + '</div>' +
+        '<div class="char-item-meta">' + esc(c.class) + ' · Lv.' + c.level + '</div>' +
+        '<div class="char-item-stars" style="color:' + col + '">' + stars + '</div>' +
+      '</div>';
+    el.addEventListener('click', () => selectCharacter(c.id));
+    list.appendChild(el);
+  });
+}
+
+// ─── Select / Edit ────────────────────────────────────────
+function selectCharacter(id) {
+  activeId = id;
+  renderCharList();
+  const c = characters.find(x => x.id === id);
+  if (!c) return;
+
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('editorPanel').style.display = 'flex';
+  document.getElementById('editorTitle').textContent = '[ ' + c.name + ' ]';
+  document.getElementById('btnSave').disabled = false;
+  document.getElementById('btnDelete').disabled = false;
+
+  // Fill form
+  document.getElementById('fName').value = c.name;
+  document.getElementById('fLevel').value = c.level;
+  document.getElementById('fClass').value = c.class;
+  document.getElementById('fRarity').value = c.rarity;
+  document.getElementById('fDesc').value = c.description || '';
+  document.getElementById('fStr').value = c.stats?.strength ?? 8;
+  document.getElementById('fInt').value = c.stats?.intelligence ?? 8;
+  document.getElementById('fHp').value = c.stats?.health ?? 8;
+  document.getElementById('fAgi').value = c.stats?.agility ?? 8;
+  document.getElementById('fCrit').value = c.stats?.critRate ?? 5;
+  document.getElementById('fCritDmg').value = c.stats?.critDamage ?? 130;
+  document.getElementById('fTags').value = (c.tags || []).join(', ');
+  document.getElementById('fNotes').value = c.notes || '';
+
+  // Fill layer overrides
+  if (c.layers) {
+    for (const [key, val] of Object.entries(c.layers)) {
+      const sel = document.getElementById('layer-' + key);
+      if (sel) sel.value = val;
+    }
+  } else {
+    resetLayerSelects();
+  }
+
+  // Load sprite
+  if (c.spriteId) {
+    const img = new Image();
+    img.onload = () => { spriteImage = img; startAnim('idle'); updateFullSheet(); };
+    img.src = API + '/sprite/' + c.spriteId;
+  } else {
+    spriteImage = null;
+    clearCanvas();
+    updateFullSheet();
+  }
+}
+
+function resetLayerSelects() {
+  document.querySelectorAll('#layerGrid select').forEach(sel => { sel.value = '__auto__'; });
+}
+
+// ─── New Character ────────────────────────────────────────
+async function newCharacter() {
+  try {
+    const c = await fetch(API + '/characters', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'New Character', class: 'Novice', level: 1, rarity: 1 }),
+    }).then(r => r.json());
+    await loadCharacters();
+    selectCharacter(c.id);
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+// ─── Save Character ───────────────────────────────────────
+async function saveCharacter() {
+  if (!activeId) return;
+
+  const layerOverrides = {};
+  let hasOverrides = false;
+  document.querySelectorAll('#layerGrid select').forEach(sel => {
+    const key = sel.id.replace('layer-', '');
+    if (sel.value !== '__auto__') { layerOverrides[key] = sel.value; hasOverrides = true; }
+  });
+
+  const body = {
+    name: document.getElementById('fName').value,
+    level: parseInt(document.getElementById('fLevel').value) || 1,
+    class: document.getElementById('fClass').value,
+    rarity: parseInt(document.getElementById('fRarity').value) || 1,
+    description: document.getElementById('fDesc').value,
+    stats: {
+      strength: parseInt(document.getElementById('fStr').value) || 8,
+      intelligence: parseInt(document.getElementById('fInt').value) || 8,
+      health: parseInt(document.getElementById('fHp').value) || 8,
+      agility: parseInt(document.getElementById('fAgi').value) || 8,
+      critRate: parseFloat(document.getElementById('fCrit').value) || 5,
+      critDamage: parseInt(document.getElementById('fCritDmg').value) || 130,
+    },
+    tags: document.getElementById('fTags').value.split(',').map(t => t.trim()).filter(Boolean),
+    notes: document.getElementById('fNotes').value,
+  };
+
+  if (hasOverrides) body.layers = layerOverrides;
+
+  try {
+    await fetch(API + '/characters/' + activeId, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    await loadCharacters();
+    selectCharacter(activeId);
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+// ─── Delete Character ─────────────────────────────────────
+async function deleteChar() {
+  if (!activeId) return;
+  if (!confirm('Delete this character permanently?')) return;
+  try {
+    await fetch(API + '/characters/' + activeId, { method: 'DELETE' });
+    activeId = null;
+    document.getElementById('emptyState').style.display = 'flex';
+    document.getElementById('editorPanel').style.display = 'none';
+    document.getElementById('editorTitle').textContent = '[ No Character Selected ]';
+    document.getElementById('btnSave').disabled = true;
+    document.getElementById('btnDelete').disabled = true;
+    await loadCharacters();
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+// ─── Generate Sprite ──────────────────────────────────────
+async function generateSprite() {
+  if (!activeId) return;
+
+  // Collect layer overrides
+  const layerOverrides = {};
+  let hasOverrides = false;
+  document.querySelectorAll('#layerGrid select').forEach(sel => {
+    const key = sel.id.replace('layer-', '');
+    if (sel.value !== '__auto__') { layerOverrides[key] = sel.value; hasOverrides = true; }
+  });
+
+  // Save first
+  await saveCharacter();
+
+  const desc = document.getElementById('fDesc').value;
+  const body = {};
+  if (hasOverrides) body.layers = layerOverrides;
+  if (desc) body.description = desc;
+
+  const btn = document.querySelector('[onclick="generateSprite()"]');
+  btn.disabled = true;
+  btn.textContent = '[ Generating... ]';
+
+  try {
+    const r = await fetch(API + '/characters/' + activeId + '/generate-sprite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+
+    // Reload
+    await loadCharacters();
+    selectCharacter(activeId);
+
+    // Update layer selects from the generated layers
+    if (data.layers) {
+      for (const [key, val] of Object.entries(data.layers)) {
+        const sel = document.getElementById('layer-' + key);
+        if (sel) sel.value = val;
+      }
+    }
+  } catch (e) {
+    alert('Generation failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '[ 🎨 Generate ]';
+  }
+}
+
+// ─── Quick Generate (no save, just description → sprite) ──
+async function quickGenerate() {
+  const desc = prompt('Describe the character (e.g. "a dark elf mage with white hair and a staff"):');
+  if (!desc) return;
+
+  // Show modal
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.innerHTML = '<div class="modal">' +
+    '<div class="modal-title">[ GENERATING ]</div>' +
+    '<div style="color:var(--muted);font-size:12px">Creating spritesheet<span class="loading-dots"></span></div>' +
+    '<div style="color:#C0C0D044;font-size:10px;margin-top:8px">' + esc(desc) + '</div>' +
+    '</div>';
+  document.body.appendChild(modal);
+
+  try {
+    const r = await fetch(API + '/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description: desc }),
+    });
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+
+    // Show result in modal
+    modal.querySelector('.modal').innerHTML =
+      '<div class="modal-title">[ GENERATED ]</div>' +
+      '<div style="text-align:center;margin-bottom:12px">' +
+        '<img src="data:image/png;base64,' + data.base64 + '" style="width:192px;image-rendering:pixelated;border:1px solid #C0C0D033" />' +
+      '</div>' +
+      '<div style="color:var(--muted);font-size:10px;margin-bottom:4px">Sprite ID: ' + data.spriteId + '</div>' +
+      '<div style="color:var(--muted);font-size:10px;margin-bottom:12px">Layers: ' + (data.loaded || []).join(', ') + '</div>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button class="btn btn-gold btn-sm" id="qgSave">[ Save as Character ]</button>' +
+        '<button class="btn btn-sm" id="qgDownload">[ ⬇ Download PNG ]</button>' +
+        '<button class="btn btn-sm" id="qgClose">[ Close ]</button>' +
+      '</div>';
+
+    modal.querySelector('#qgClose').addEventListener('click', () => modal.remove());
+    modal.querySelector('#qgDownload').addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.href = 'data:image/png;base64,' + data.base64;
+      a.download = data.spriteId + '.png';
+      a.click();
+    });
+    modal.querySelector('#qgSave').addEventListener('click', async () => {
+      const c = await fetch(API + '/characters', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: desc.slice(0, 40),
+          class: 'Custom',
+          description: desc,
+          spriteId: data.spriteId,
+          layers: data.layers,
+        }),
+      }).then(r => r.json());
+      modal.remove();
+      await loadCharacters();
+      selectCharacter(c.id);
+    });
+  } catch (e) {
+    modal.querySelector('.modal').innerHTML =
+      '<div class="modal-title" style="color:var(--red)">[ ERROR ]</div>' +
+      '<div style="color:var(--muted);font-size:12px">' + esc(e.message) + '</div>' +
+      '<button class="btn btn-sm" onclick="this.closest(\'.modal-overlay\').remove()" style="margin-top:12px">[ Close ]</button>';
+  }
+}
+
+// ─── Download Sprite ──────────────────────────────────────
+function downloadSprite() {
+  if (!activeId) return;
+  const c = characters.find(x => x.id === activeId);
+  if (!c || !c.spriteId) { alert('No sprite to download'); return; }
+  const a = document.createElement('a');
+  a.href = API + '/sprite/' + c.spriteId;
+  a.download = (c.name || c.spriteId) + '.png';
+  a.click();
+}
+
+// ─── Canvas / Animation ───────────────────────────────────
+function clearCanvas() {
+  const ctx = document.getElementById('spriteCanvas').getContext('2d');
+  ctx.clearRect(0, 0, 64, 64);
+  ctx.fillStyle = '#1A0025';
+  ctx.font = '10px Courier New';
+  ctx.textAlign = 'center';
+  ctx.fillText('[ No Sprite ]', 32, 36);
+}
+
+function startAnim(name) {
+  currentAnim = name;
+  if (animTimer) clearInterval(animTimer);
+  if (!spriteImage) return;
+
+  const canvas = document.getElementById('spriteCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+
+  // Idle = static frame using the actual idle_down row (row 24, first frame)
+  if (name === 'idle') {
+    ctx.clearRect(0, 0, 64, 64);
+    const idleRow = LPC_ANIMS['idle_down'] ? LPC_ANIMS['idle_down'].row : 24;
+    ctx.drawImage(spriteImage, 0, idleRow * 64, 64, 64, 0, 0, 64, 64);
+    document.querySelectorAll('.sprite-anim-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.anim === name);
+    });
+    return;
+  }
+
+  const animKey = ALIASES[name] || name;
+  const anim = LPC_ANIMS[animKey] || LPC_ANIMS['idle_down'];
+  let frame = 0;
+
+  function draw() {
+    const f = frame % anim.frames;
+    ctx.clearRect(0, 0, 64, 64);
+    ctx.drawImage(spriteImage, f * 64, anim.row * 64, 64, 64, 0, 0, 64, 64);
+    frame++;
+  }
+
+  draw();
+  animTimer = setInterval(draw, 160);
+
+  // Update active button
+  document.querySelectorAll('.sprite-anim-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.anim === name);
+  });
+}
+
+function updateFullSheet() {
+  const wrap = document.getElementById('fullSheet');
+  if (!spriteImage) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = '<img src="' + spriteImage.src + '" />';
+}
+
+function buildAnimButtons() {
+  const container = document.getElementById('animBtns');
+  const anims = ['idle', 'walk', 'run', 'attack', 'cast', 'shoot', 'hurt', 'climb',
+    'jump', 'sit', 'combat',
+    'walk_up', 'walk_left', 'walk_right',
+    'idle_up', 'idle_left', 'idle_right',
+    'run_up', 'run_left', 'run_right',
+    'thrust_down', 'thrust_right'];
+  anims.forEach(name => {
+    const btn = document.createElement('button');
+    btn.className = 'sprite-anim-btn' + (name === 'idle' ? ' active' : '');
+    btn.dataset.anim = name;
+    btn.textContent = name;
+    btn.addEventListener('click', () => startAnim(name));
+    container.appendChild(btn);
+  });
+}
+
+// ─── Layer Grid ───────────────────────────────────────────
+function buildLayerGrid() {
+  const grid = document.getElementById('layerGrid');
+  for (const [key, def] of Object.entries(lpcLayers)) {
+    const field = document.createElement('div');
+    field.className = 'field';
+    const label = document.createElement('label');
+    label.textContent = key.replace(/_/g, ' ');
+    const select = document.createElement('select');
+    select.id = 'layer-' + key;
+
+    // Auto option
+    const autoOpt = document.createElement('option');
+    autoOpt.value = '__auto__';
+    autoOpt.textContent = '(auto)';
+    select.appendChild(autoOpt);
+
+    def.options.forEach(opt => {
+      const o = document.createElement('option');
+      o.value = opt;
+      o.textContent = opt;
+      select.appendChild(o);
+    });
+
+    field.appendChild(label);
+    field.appendChild(select);
+    grid.appendChild(field);
+  }
+}
+
+// ─── Search ───────────────────────────────────────────────
+let searchTimeout = null;
+document.getElementById('search').addEventListener('input', e => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => loadCharacters(e.target.value || ''), 250);
+});
+
+// ─── Util ─────────────────────────────────────────────────
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+// ─── Boot ─────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
