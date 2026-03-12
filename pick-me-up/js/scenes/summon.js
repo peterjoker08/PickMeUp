@@ -65,22 +65,29 @@ let pendingResults = [];
 // ─── TUTORIAL GUARANTEED HERO ─────────────────────────────
 function createShayHero() {
   var uid = 'shay_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-  return {
+  var weaponProf = typeof _initProficiency === 'function' ? _initProficiency() : {};
+  var hero = {
     id: uid, type: 'hero', name: 'Shay Radasterry', rarity: 4, class: 'Knight',
     level: 1, exp: 0, talent: generateTalent(4),
     stats: {
       strength: 18, intelligence: 10, health: 160, agility: 20,
       critRate: 5.0, critDamage: 140.0, reactionTime: 0.82,
     },
-    equippedWeapon: null, inParty: false,
+    equippedWeapons: { mainHand: null, offHand: null },
+    inParty: false, inDungeon: false,
     skills: [
       { name: 'Tactical Combat', level: 1 },
       { name: 'Intermediate Swordsmanship', level: 1 },
       { name: "Knight's Resolve", level: 1 },
     ],
     isNew: true, isCommoner: false, isTutorialHero: true,
+    weaponProficiency: weaponProf,
+    activePenalty: null,
+    statusEffects: [],
     spriteId: null,
   };
+  if (typeof applyInnateProf === 'function') applyInnateProf(hero);
+  return hero;
 }
 
 // ─── TALENT HELPERS ───────────────────────────────────────
@@ -250,13 +257,21 @@ function generateResult(bannerKey, rarity) {
 
   // 1★ heroes are summoned WITHOUT a weapon; higher rarities get null too
   // (weapons come from weapon banner or drops), but we mark commoner origin
-  return {
+  const weaponProf = typeof _initProficiency === 'function' ? _initProficiency() : {};
+  const hero = {
     id: uid, type: 'hero', name, rarity, class: cls,
     level: 1, exp: 0, talent, stats,
-    equippedWeapon: null, inParty: false, skills: [], isNew: true,
+    equippedWeapons: { mainHand: null, offHand: null },
+    inParty: false, inDungeon: false,
+    skills: [], isNew: true,
     isCommoner: rarity === 1,
+    weaponProficiency: weaponProf,
+    activePenalty: null,
+    statusEffects: [],
     spriteId: null,  // filled async by sprite server
   };
+  if (typeof applyInnateProf === 'function') applyInnateProf(hero);
+  return hero;
 }
 
 function performPull(bannerKey, count) {
@@ -562,6 +577,12 @@ function showResultsPanel(results) {
   });
 
   newAgain.addEventListener('click', () => {
+    // Auto-add pending results to inventory so they aren't lost
+    if (pendingResults.length > 0) {
+      pendingResults.forEach(r => gameState.inventory.push(r));
+      saveGame();
+      pendingResults = [];
+    }
     overlay.classList.remove('visible');
     refreshSummonContent();
   });

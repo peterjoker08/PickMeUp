@@ -387,9 +387,29 @@ function swapPartySlot(slotIndex, heroId) {
     const oldHero = gameState.inventory.find(h => h.id === oldId);
     if (oldHero) oldHero.inParty = false;
   }
+
+  // Remove heroId from any existing slot to prevent duplicates
+  const existingSlot = gameState.party.indexOf(heroId);
+  if (existingSlot !== -1 && existingSlot !== slotIndex) {
+    // Swap: put the old occupant of target slot into the hero's previous slot
+    if (oldId) {
+      gameState.party[existingSlot] = oldId;
+      const oldHero = gameState.inventory.find(h => h.id === oldId);
+      if (oldHero) oldHero.inParty = true;
+    } else {
+      gameState.party[existingSlot] = undefined;
+    }
+  }
+
   gameState.party[slotIndex] = heroId;
   const newHero = gameState.inventory.find(h => h.id === heroId);
   if (newHero) newHero.inParty = true;
+
+  // Clean up undefined slots at the end
+  while (gameState.party.length > 0 && gameState.party[gameState.party.length - 1] === undefined) {
+    gameState.party.pop();
+  }
+
   saveGame();
 }
 
@@ -416,6 +436,12 @@ function equipWeapon(heroId, weaponId, slot) {
   if (existingId) {
     const existing = gameState.inventory.find(i => i.id === existingId);
     if (existing) existing.equippedTo = null;
+  }
+
+  // If weapon is already in the other slot on the same hero, clear it
+  const otherSlot = slot === 'mainHand' ? 'offHand' : 'mainHand';
+  if (hero.equippedWeapons[otherSlot] === weaponId) {
+    hero.equippedWeapons[otherSlot] = null;
   }
 
   // If weapon is already on a different hero, remove it from there
@@ -477,6 +503,12 @@ function getEffectiveStats(hero) {
     eAGI = Math.floor(eAGI * mult);
   }
 
+  // Clamp stats to 0 minimum (Axe weapons can cause negative AGI)
+  eSTR = Math.max(0, eSTR);
+  eINT = Math.max(0, eINT);
+  eHP  = Math.max(1, eHP);   // HP must be at least 1
+  eAGI = Math.max(0, eAGI);
+
   return { effectiveSTR: eSTR, effectiveINT: eINT, effectiveHP: eHP, effectiveAGI: eAGI };
 }
 
@@ -528,7 +560,7 @@ function recordFloorClear(floorNum) {
   if (!gameState.tower.clearedFloors.includes(floorNum)) {
     gameState.tower.clearedFloors.push(floorNum);
   }
-  if (floorNum === gameState.tower.currentFloor) {
+  if (floorNum === gameState.tower.currentFloor && gameState.tower.currentFloor < 100) {
     gameState.tower.currentFloor++;
   }
   gameState.currentFloor = gameState.tower.currentFloor;
@@ -728,6 +760,16 @@ function performPromotion(heroId) {
 
   const oldRarity = hero.rarity;
   hero.rarity++;
+
+  // Recalculate base stats for new rarity (preserve level-up gains)
+  if (typeof BASE_STATS !== 'undefined' && BASE_STATS[hero.rarity] && BASE_STATS[oldRarity]) {
+    const oldBase = BASE_STATS[oldRarity];
+    const newBase = BASE_STATS[hero.rarity];
+    hero.stats.strength     += (newBase.str - oldBase.str);
+    hero.stats.intelligence += (newBase.int - oldBase.int);
+    hero.stats.health       += (newBase.hp  - oldBase.hp);
+    hero.stats.agility      += (newBase.agi - oldBase.agi);
+  }
 
   // Stub: unlock memory
   console.log(`[Promotion] Memory unlock for ${hero.name}: TBD (${oldRarity}★ → ${hero.rarity}★)`);

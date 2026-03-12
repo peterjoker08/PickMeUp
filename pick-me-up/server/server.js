@@ -26,6 +26,12 @@ import {
   getAllCharacters, getCharacter, createCharacter,
   updateCharacter, deleteCharacter, searchCharacters,
 } from "./db.js";
+import {
+  parseSheetDefinitions,
+  buildLayerCatalog,
+  resolveLayerFiles,
+  buildCreditsText,
+} from "./lpc-sheets.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3777;
@@ -40,7 +46,20 @@ const CONFIG = {
 
 fs.mkdirSync(CONFIG.cacheDir, { recursive: true });
 
-// ─── LPC Layer Definitions (same as generate.js) ──────────
+// ─── Parse LPC repo sheet_definitions (if available) ───────
+let lpcParsed = null;
+let lpcCatalog = null;
+try {
+  if (fs.existsSync(CONFIG.lpcRepoPath)) {
+    lpcParsed = parseSheetDefinitions(CONFIG.lpcRepoPath);
+    lpcCatalog = buildLayerCatalog(lpcParsed);
+    console.log(`Parsed ${lpcParsed.definitions.length} LPC sheet definitions`);
+  }
+} catch (e) {
+  console.warn("Could not parse LPC sheet definitions:", e.message);
+}
+
+// ─── LPC Layer Definitions (hardcoded fallback) ────────────
 const LPC_LAYERS = {
   body: {
     description: "Base body type",
@@ -996,7 +1015,28 @@ app.get("/studio", (req, res) => {
 
 // Expose LPC layer definitions for the studio
 app.get("/lpc-layers", (req, res) => {
-  res.json(LPC_LAYERS);
+  res.json({
+    layers: LPC_LAYERS,
+    repoCatalog: lpcCatalog,
+    repoAvailable: !!lpcParsed,
+    definitionCount: lpcParsed ? lpcParsed.definitions.length : 0,
+  });
+});
+
+// Expose full repo catalog categories
+app.get("/lpc-catalog", (req, res) => {
+  if (!lpcParsed) {
+    return res.status(503).json({ error: "LPC repo not parsed. Clone the repo first." });
+  }
+  res.json({
+    categories: Object.fromEntries(
+      Object.entries(lpcParsed.categories).map(([cat, items]) => [
+        cat,
+        items.map(i => ({ key: i.key, name: i.name, variants: i.variants })),
+      ])
+    ),
+    catalog: lpcCatalog,
+  });
 });
 
 // ─── Start ─────────────────────────────────────────────────
