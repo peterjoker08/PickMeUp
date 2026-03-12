@@ -1,11 +1,13 @@
 # Dependencies
 pick-me-up/server/node_modules/
+pick-me-up/assets/characterGenerator/files/node_modules/
 
 # Large asset tools (1.4GB LPC generator - clone separately if needed)
 pick-me-up/assets/characterGenerator/Universal-LPC-Spritesheet-Character-Generator/
 
 # Generated sprite cache
 pick-me-up/server/sprite-cache/
+pick-me-up/assets/characterGenerator/files/output/
 
 # Zip archives (asset packs)
 pick-me-up/assets/zips/

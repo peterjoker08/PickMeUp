@@ -1,0 +1,11 @@
+{
+  "name": "lpc-generate-cli",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "CLI for LPC spritesheet generation",
+  "main": "generate.js",
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.44",
+    "groq-sdk": "^0.3.0"
+  }
+}
