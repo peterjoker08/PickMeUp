@@ -18,6 +18,23 @@ let _wpFilterType = 'All';
 let _wiSortMode   = 'rarity';
 let _wiFilterType = 'All';
 
+// ─── AFFINITY SYSTEM ──────────────────────────────────────
+// Milestones auto-grant rewards; stored on hero.affinityMilestonesGranted[]
+const AFFINITY_MILESTONES = [
+  { threshold: 100,  label: 'First Bond',      reward: { gems: 50 } },
+  { threshold: 300,  label: 'Growing Trust',   reward: { backstory: true } },
+  { threshold: 500,  label: 'Trusted Friend',  reward: { talentBoost: 0.5 } },
+  { threshold: 700,  label: 'Cherished Bond',  reward: { gems: 50 } },
+  { threshold: 1000, label: 'Close Companion', reward: { backstory: true } },
+  { threshold: 1300, label: 'Devoted',         reward: { gems: 300 } },
+  { threshold: 1700, label: "Heart's Friend",  reward: { talentBoost: 0.5 } },
+  { threshold: 2200, label: 'Soul Bound',      reward: { backstory: true } },
+  { threshold: 3000, label: 'Eternal Bond',    reward: { gems: 100 } },
+  { threshold: 4500, label: 'Transcendent',    reward: { gems: 300, latentTalent: true } },
+  { threshold: 8000, label: 'Legend',          reward: { gems: 300, skillTierUp: true } },
+];
+const _AFFINITY_MAX = 8000;
+
 // Hero detail
 let _currentDetailHero = null;
 
@@ -544,6 +561,28 @@ function renderHeroDetailContent(hero, panel) {
   const expNext = hero.level * 100;
   const eff     = getEffectiveStats(hero);
 
+  // ── Affinity bar ──
+  const affinity     = hero.affinity || 0;
+  const _nextMs      = AFFINITY_MILESTONES.find(m => affinity < m.threshold);
+  const _nextMsIdx   = _nextMs ? AFFINITY_MILESTONES.indexOf(_nextMs) : AFFINITY_MILESTONES.length;
+  const _prevThresh  = _nextMsIdx > 0 ? AFFINITY_MILESTONES[_nextMsIdx - 1].threshold : 0;
+  const _nextThresh  = _nextMs ? _nextMs.threshold : _AFFINITY_MAX;
+  const _affinityMaxed = affinity >= _AFFINITY_MAX;
+  const _affinityLabel = _affinityMaxed ? 'MAX' : (_nextMs ? _nextMs.label : '—');
+  const _fillPct     = _affinityMaxed ? 100
+    : Math.min(100, Math.round(((affinity - _prevThresh) / (_nextThresh - _prevThresh)) * 100));
+  const _today       = new Date().toISOString().slice(0, 10);
+  const affinityBarHTML = `
+    <div style="border-bottom:1px solid #2A003A;padding:10px 0 12px;margin-bottom:16px;font-family:'Courier New',monospace">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="color:#C0C0D0;font-size:11px;letter-spacing:2px">[ AFFINITY ]</span>
+        <span style="color:#E8D5FF;font-size:11px">${affinity} / ${_affinityMaxed ? _AFFINITY_MAX + ' ★ MAX' : _nextThresh + ' — ' + escHtml(_affinityLabel)}</span>
+      </div>
+      <div style="background:#2A003A;height:5px;border-radius:3px">
+        <div style="background:#FF69B4;width:${_fillPct}%;height:5px;border-radius:3px"></div>
+      </div>
+    </div>`;
+
   // ── Base stats ──
   const baseGrid = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px 32px;font-size:12px;
@@ -624,6 +663,8 @@ function renderHeroDetailContent(hero, panel) {
           <span style="color:#00FFFF">1.0s − (${hero.talent} × 0.07s) = ${hero.stats.reactionTime}s</span></div>
         <div style="grid-column:1/-1"><span class="detail-label">Lvl Bonus/lvl: </span>
           <span style="color:#00FFFF">+${Math.floor(hero.talent * 0.15)} per stat per level</span></div>
+        <div style="grid-column:1/-1"><span class="detail-label">Affinity: </span>
+          <span style="color:#FF69B4">${affinity} (talked: ${hero.talkDate || 'never'})</span></div>
       </div>
     </div>` : '';
 
@@ -633,18 +674,28 @@ function renderHeroDetailContent(hero, panel) {
         <div style="color:#FFFFFF;font-size:17px;font-weight:bold;letter-spacing:1px">${escHtml(hero.name)}</div>
         <div style="color:${col};font-size:15px;margin-top:5px;letter-spacing:2px">${stars}</div>
       </div>
-      <button id="hd-close-btn"
-        style="background:#1A0025;border:2px solid #C0C0D0;color:#FFFFFF;font-family:'Courier New',monospace;
-               font-size:12px;padding:7px 18px;cursor:pointer;letter-spacing:1px;white-space:nowrap;flex-shrink:0;
-               transition:box-shadow 0.2s"
-        onmouseover="this.style.boxShadow='0 0 10px #7B2FBE'"
-        onmouseout="this.style.boxShadow=''">[ × CLOSE ]</button>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0">
+        <button id="hd-close-btn"
+          style="background:#1A0025;border:2px solid #C0C0D0;color:#FFFFFF;font-family:'Courier New',monospace;
+                 font-size:12px;padding:7px 18px;cursor:pointer;letter-spacing:1px;white-space:nowrap;
+                 transition:box-shadow 0.2s"
+          onmouseover="this.style.boxShadow='0 0 10px #7B2FBE'"
+          onmouseout="this.style.boxShadow=''">[ × CLOSE ]</button>
+        <button id="hd-affinity-btn"
+          style="background:#1A0025;border:2px solid #FF69B4;color:#FF69B4;font-family:'Courier New',monospace;
+                 font-size:11px;padding:5px 14px;cursor:pointer;letter-spacing:1px;white-space:nowrap;
+                 transition:box-shadow 0.2s"
+          onmouseover="this.style.boxShadow='0 0 8px #FF69B4'"
+          onmouseout="this.style.boxShadow=''">[ ♥ AFFINITY ]</button>
+      </div>
     </div>
 
     <div style="background:#080010;border:1px solid #2A003A;height:160px;
-                display:flex;align-items:center;justify-content:center;margin-bottom:22px">
+                display:flex;align-items:center;justify-content:center;margin-bottom:16px">
       <span style="color:#1A0025;font-size:14px;letter-spacing:3px">[ Hero Art ]</span>
     </div>
+
+    ${affinityBarHTML}
 
     ${hero.inDungeon ? `<div style="background:#2A1800;border:2px solid #F1C40F;padding:10px 16px;
       margin-bottom:18px;font-family:'Courier New',monospace;font-size:12px;color:#F1C40F;letter-spacing:1px">
@@ -665,6 +716,7 @@ function renderHeroDetailContent(hero, panel) {
     <div id="hd-party-btn-area" style="margin-top:20px;padding-top:16px;border-top:1px solid #2A003A;"></div>`;
 
   document.getElementById('hd-close-btn').addEventListener('click', closeHeroDetail);
+  document.getElementById('hd-affinity-btn').addEventListener('click', () => openAffinityPanel(hero));
   _attachEquipListeners(hero, panel);
   renderHeroDetailPartyBtn(hero);
 }
@@ -1346,6 +1398,230 @@ function closeHeroDetail() {
     _currentDetailHero = null;
   }, 180);
 }
+
+// ═══════════════════════════════════════════════════════════
+// HERO AFFINITY SYSTEM
+// ═══════════════════════════════════════════════════════════
+
+// ─── AFFINITY PANEL OVERLAY ───────────────────────────────
+// Opens on top of the hero detail panel (z-index 1650).
+function openAffinityPanel(hero) {
+  const existing = document.getElementById('affinity-panel-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'affinity-panel-overlay';
+  overlay.style.cssText =
+    'position:fixed;inset:0;z-index:1650;display:flex;align-items:center;' +
+    'justify-content:center;background:rgba(0,0,0,0.80);pointer-events:all;';
+
+  const panel = document.createElement('div');
+  panel.id = 'affinity-panel-inner';
+  panel.style.cssText =
+    'background:#12001A;border:2px solid #FF69B4;' +
+    'box-shadow:0 0 20px rgba(255,105,180,0.35),inset 0 0 20px rgba(255,105,180,0.05);' +
+    'padding:28px 32px;width:480px;max-height:82vh;overflow-y:auto;' +
+    'font-family:\'Courier New\',monospace;' +
+    'opacity:0;transform:translateY(16px);transition:opacity 0.22s,transform 0.22s;';
+
+  overlay.appendChild(panel);
+  document.getElementById('ui-layer').appendChild(overlay);
+
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    panel.style.opacity   = '1';
+    panel.style.transform = 'translateY(0)';
+  }));
+
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) _closeAffinityPanel();
+  });
+
+  _renderAffinityPanel(hero);
+}
+
+function _closeAffinityPanel() {
+  const overlay = document.getElementById('affinity-panel-overlay');
+  if (!overlay) return;
+  const panel = overlay.firstElementChild;
+  panel.style.transition = 'opacity 0.16s,transform 0.16s';
+  panel.style.opacity    = '0';
+  panel.style.transform  = 'translateY(-12px)';
+  setTimeout(() => overlay.remove(), 170);
+}
+
+function _renderAffinityPanel(hero) {
+  const panel = document.getElementById('affinity-panel-inner');
+  if (!panel) return;
+
+  const affinity      = hero.affinity || 0;
+  const today         = new Date().toISOString().slice(0, 10);
+  const talkAvail     = hero.talkDate !== today;
+  const nextMs        = AFFINITY_MILESTONES.find(m => affinity < m.threshold);
+  const nextMsIdx     = nextMs ? AFFINITY_MILESTONES.indexOf(nextMs) : AFFINITY_MILESTONES.length;
+  const prevThresh    = nextMsIdx > 0 ? AFFINITY_MILESTONES[nextMsIdx - 1].threshold : 0;
+  const nextThresh    = nextMs ? nextMs.threshold : _AFFINITY_MAX;
+  const affinityMaxed = affinity >= _AFFINITY_MAX;
+  const fillPct       = affinityMaxed ? 100
+    : Math.min(100, Math.round(((affinity - prevThresh) / (nextThresh - prevThresh)) * 100));
+
+  // Milestone rows
+  const granted = Array.isArray(hero.affinityMilestonesGranted) ? hero.affinityMilestonesGranted : [];
+  const msRowsHTML = AFFINITY_MILESTONES.map(m => {
+    const reached   = affinity >= m.threshold;
+    const rewarded  = granted.includes(m.threshold);
+    const r         = m.reward;
+    const rewardStr = r.gems && r.skillTierUp   ? `💎 ${r.gems} Gems + Skill Tier Up`
+                    : r.gems && r.latentTalent  ? `💎 ${r.gems} Gems + Latent Talent`
+                    : r.gems                    ? `💎 ${r.gems} Gems`
+                    : r.talentBoost             ? `⭐ Talent +${r.talentBoost}`
+                    : r.backstory               ? `📖 Backstory Unlocked`
+                    : '—';
+    const rowCol    = reached ? '#4CAF50' : '#555566';
+    const checkmark = rewarded ? '✓ ' : reached ? '! ' : '  ';
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;
+                  padding:7px 0;border-bottom:1px solid #1A0025;font-size:11px">
+        <span style="color:${rowCol};min-width:24px">${checkmark}</span>
+        <span style="color:${rowCol};min-width:60px">${m.threshold}</span>
+        <span style="color:${reached ? '#E8D5FF' : '#555566'};flex:1">${escHtml(m.label)}</span>
+        <span style="color:${reached ? '#F1C40F' : '#444460'};text-align:right">${rewardStr}</span>
+      </div>`;
+  }).join('');
+
+  // Dialogue
+  const dialogue = (typeof getHeroDialogue === 'function')
+    ? getHeroDialogue(hero, affinity)
+    : '...';
+
+  const talkBorder = talkAvail ? '#FF69B4' : '#333348';
+  const talkColor  = talkAvail ? '#FFFFFF' : '#333348';
+  const talkCursor = talkAvail ? 'pointer' : 'not-allowed';
+  const talkLabel  = talkAvail ? '[ TALK (+20 Affinity) ]' : '[ ✓ TALKED TODAY ]';
+
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <div style="color:#FF69B4;font-size:15px;letter-spacing:2px">[ AFFINITY ]</div>
+      <button id="affinity-close-btn"
+        style="background:#1A0025;border:2px solid #C0C0D0;color:#FFFFFF;
+               font-family:'Courier New',monospace;font-size:12px;padding:6px 16px;
+               cursor:pointer;letter-spacing:1px;transition:box-shadow 0.2s"
+        onmouseover="this.style.boxShadow='0 0 8px #7B2FBE'"
+        onmouseout="this.style.boxShadow=''">[ × ]</button>
+    </div>
+
+    <div style="color:#FFFFFF;font-size:14px;letter-spacing:1px;margin-bottom:4px">${escHtml(hero.name)}</div>
+    <div style="color:#E8D5FF;font-size:11px;margin-bottom:16px">
+      ${affinity} / ${affinityMaxed ? _AFFINITY_MAX + ' ★ MAX' : nextThresh + ' — ' + escHtml(nextMs ? nextMs.label : '—')}
+    </div>
+
+    <div style="background:#2A003A;height:7px;border-radius:4px;margin-bottom:20px">
+      <div style="background:#FF69B4;width:${fillPct}%;height:7px;border-radius:4px"></div>
+    </div>
+
+    <div style="border:1px solid #2A003A;padding:14px 16px;margin-bottom:20px;
+                font-style:italic;color:#E8D5FF;font-size:12px;line-height:1.6;min-height:48px">
+      "${escHtml(dialogue)}"
+    </div>
+
+    <button id="affinity-talk-btn"
+      style="width:100%;background:#1A0025;border:2px solid ${talkBorder};color:${talkColor};
+             font-family:'Courier New',monospace;font-size:13px;padding:10px;
+             cursor:${talkCursor};letter-spacing:1px;margin-bottom:24px;transition:box-shadow 0.2s"
+      ${talkAvail ? '' : 'disabled'}
+      onmouseover="if(!this.disabled)this.style.boxShadow='0 0 12px #FF69B4'"
+      onmouseout="this.style.boxShadow=''">${talkLabel}</button>
+
+    <div style="color:#C0C0D0;font-size:11px;letter-spacing:2px;margin-bottom:10px">[ MILESTONES ]</div>
+    ${msRowsHTML}`;
+
+  panel.querySelector('#affinity-close-btn').addEventListener('click', _closeAffinityPanel);
+
+  const talkBtn = panel.querySelector('#affinity-talk-btn');
+  if (talkBtn && talkAvail) {
+    talkBtn.addEventListener('click', () => {
+      talkBtn.disabled = true;
+      talkToHero(hero.id);
+    });
+  }
+}
+
+// ─── TALK TO HERO ─────────────────────────────────────────
+// +20 affinity, once per day. Triggers quest hook and milestone check.
+function talkToHero(heroId) {
+  const hero = gameState.inventory.find(h => h.id === heroId && h.type === 'hero');
+  if (!hero) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (hero.talkDate === today) return;  // already talked today
+
+  hero.affinity = (hero.affinity || 0) + 20;
+  hero.talkDate = today;
+  saveGame();
+
+  if (typeof progressDailyQuest === 'function') progressDailyQuest('talkToHero');
+
+  _checkAffinityMilestones(hero);
+  _renderAffinityPanel(hero);
+
+  // Refresh the mini-bar in the hero detail (if still open)
+  if (_currentDetailHero && _currentDetailHero.id === heroId) {
+    refreshHeroDetail();
+  }
+}
+
+// ─── MILESTONE CHECK ──────────────────────────────────────
+// Auto-grants any milestone rewards the hero has newly reached.
+function _checkAffinityMilestones(hero) {
+  if (!Array.isArray(hero.affinityMilestonesGranted)) {
+    hero.affinityMilestonesGranted = [];
+  }
+  const affinity = hero.affinity || 0;
+  AFFINITY_MILESTONES.forEach(m => {
+    if (affinity >= m.threshold && !hero.affinityMilestonesGranted.includes(m.threshold)) {
+      hero.affinityMilestonesGranted.push(m.threshold);
+      _grantAffinityMilestone(hero, m);
+    }
+  });
+  saveGame();
+}
+
+function _grantAffinityMilestone(hero, milestone) {
+  const r = milestone.reward;
+
+  if (r.gems) {
+    if (typeof sendMail === 'function') {
+      sendMail({
+        from:    hero.name,
+        subject: 'Affinity Milestone: ' + milestone.label,
+        body:    hero.name + ' has reached ' + milestone.threshold + ' affinity! You\'ve grown closer.',
+        rewards: { gems: r.gems },
+      });
+    }
+  }
+
+  if (r.talentBoost) {
+    hero.talent = Math.min(10, parseFloat(((hero.talent || 0) + r.talentBoost).toFixed(1)));
+    console.log('[Affinity] Talent boost for', hero.name, '+', r.talentBoost, '→', hero.talent);
+    // NOTE: full stat rebuild (buildHeroStats) deferred — see TODOS.md
+  }
+
+  if (r.backstory) {
+    console.log('[Affinity] Backstory unlock stub for', hero.name, 'at', milestone.threshold);
+    // TODO: open backstory modal — see TODOS.md
+  }
+
+  if (r.latentTalent) {
+    console.log('[Affinity] Latent Talent stub for', hero.name);
+    // TODO: implement Latent Talent system — see TODOS.md
+  }
+
+  if (r.skillTierUp) {
+    console.log('[Affinity] Skill tier-up stub for', hero.name);
+    // TODO: implement skill tier increase — see TODOS.md
+  }
+}
+
+window.talkToHero = talkToHero;
 
 // ─── UTILITY ──────────────────────────────────────────────
 // escHtml, talentColor, talentTierLabel → js/ui/helpers.js
