@@ -1,4 +1,20 @@
 // ═══════════════════════════════════════════════════════════
+// DAILY QUEST KEYS
+// ═══════════════════════════════════════════════════════════
+// Defined here (before gameState) so loadGame() can iterate them
+// before dailyQuests.js loads. dailyQuests.js reads this same array.
+// ── Daily reset pattern (3rd use — see checkShopReset, checkDungeonResets).
+// If a 4th reset appears, extract to checkDailyReset(stateKey, resetFn) in helpers.js.
+window.QUEST_KEYS = [
+  'towerChallenge',  // complete a new tower floor
+  'summon',          // commit pendingResults to inventory
+  'towerRewards',    // claim daily reward on a cleared floor
+  'expedition',      // dispatch a dungeon run
+  'shopPurchase',    // purchaseItem() success
+  'talkToHero',      // talkToHero() first talk of day
+];
+
+// ═══════════════════════════════════════════════════════════
 // GAME STATE
 // ═══════════════════════════════════════════════════════════
 window.gameState = {
@@ -18,7 +34,7 @@ window.gameState = {
   tower: {
     currentFloor:       1,
     clearedFloors:      [],
-    floorRevisitClaimed: {},
+    floorRevisitClaimed: {}, // reserved — future per-floor granularity (currently unused; lastRevisitReset is active)
     lastRevisitReset:   null,
   },
   materials: [],
@@ -41,6 +57,12 @@ window.gameState = {
   firstPullDone: false,  synergy: { level: 0 },
   afkRewards: {
     lastCollectTime: null,   // timestamp of last AFK reward collection / login
+  },
+  dailyQuests: {
+    lastReset:          null,   // "YYYY-MM-DD" ISO string, null = never reset
+    progress:           {},     // { [questKey]: 0|1 } — populated by migrateInventory
+    claimed:            {},     // { [questKey]: bool } — populated by migrateInventory
+    allCompleteClaimed: false,  // all-6 bonus claimed today
   },
 };
 
@@ -66,6 +88,7 @@ function saveGame() {
     firstPullDone:    gameState.firstPullDone,
     synergy:          gameState.synergy,
     afkRewards:       gameState.afkRewards,
+    dailyQuests:      gameState.dailyQuests,
   }));
 }
 
@@ -118,12 +141,27 @@ function loadGame() {
         gameState.shop.lastStockReset  = d.shop.lastStockReset  || null;
         gameState.shop.purchaseHistory = Array.isArray(d.shop.purchaseHistory) ? d.shop.purchaseHistory : [];
       }
+      if (d.dailyQuests) {
+        gameState.dailyQuests.lastReset          = d.dailyQuests.lastReset          || null;
+        gameState.dailyQuests.allCompleteClaimed = !!d.dailyQuests.allCompleteClaimed;
+        if (d.dailyQuests.progress) {
+          QUEST_KEYS.forEach(k => {
+            gameState.dailyQuests.progress[k] =
+              typeof d.dailyQuests.progress[k] === 'number' ? d.dailyQuests.progress[k] : 0;
+          });
+        }
+        if (d.dailyQuests.claimed) {
+          QUEST_KEYS.forEach(k => {
+            gameState.dailyQuests.claimed[k] = !!d.dailyQuests.claimed[k];
+          });
+        }
+      }
       migrateInventory();
       checkDungeonResets();
       checkShopReset();
       return true;
     }
-  } catch (e) {}
+  } catch (e) { console.error('[loadGame]', e); }
   return false;
 }
 
@@ -284,7 +322,7 @@ function migrateInventory() {
 
   // ── Tower migration ──
   if (!gameState.tower) {
-    gameState.tower = { currentFloor: 1, clearedFloors: [], floorRevisitClaimed: {}, lastRevisitReset: null };
+    gameState.tower = { currentFloor: 1, clearedFloors: [], floorRevisitClaimed: {}, lastRevisitReset: null }; // reserved — future per-floor granularity (currently unused; lastRevisitReset is active)
     changed = true;
   }
   if (!Array.isArray(gameState.materials)) { gameState.materials = []; changed = true; }
@@ -311,6 +349,23 @@ function migrateInventory() {
   }
   if (!Array.isArray(gameState.shop.dailyStock))      { gameState.shop.dailyStock      = []; changed = true; }
   if (!Array.isArray(gameState.shop.purchaseHistory)) { gameState.shop.purchaseHistory = []; changed = true; }
+
+  // ── Daily Quests migration ──
+  if (!gameState.dailyQuests) {
+    gameState.dailyQuests = { lastReset: null, progress: {}, claimed: {}, allCompleteClaimed: false };
+    changed = true;
+  }
+  QUEST_KEYS.forEach(k => {
+    if (typeof gameState.dailyQuests.progress[k] !== 'number') {
+      gameState.dailyQuests.progress[k] = 0; changed = true;
+    }
+    if (typeof gameState.dailyQuests.claimed[k] !== 'boolean') {
+      gameState.dailyQuests.claimed[k] = false; changed = true;
+    }
+  });
+  if (typeof gameState.dailyQuests.allCompleteClaimed !== 'boolean') {
+    gameState.dailyQuests.allCompleteClaimed = false; changed = true;
+  }
 
   // Auto-complete any finished active runs
   gameState.dungeons.activeRuns.forEach(run => {
@@ -351,6 +406,17 @@ function migrateInventory() {
       if (!Array.isArray(item.statusEffects)) {
         item.statusEffects = [];
         changed = true;
+      }
+
+      // ── Affinity migration ──
+      if (typeof item.affinity === 'undefined' || item.affinity === null) {
+        item.affinity = 0; changed = true;
+      }
+      if (typeof item.talkDate === 'undefined') {
+        item.talkDate = null; changed = true;
+      }
+      if (!Array.isArray(item.affinityMilestonesGranted)) {
+        item.affinityMilestonesGranted = []; changed = true;
       }
     }
 
@@ -632,6 +698,7 @@ function dispatchDungeon(dungeonId, heroIds) {
   });
 
   saveGame();
+  if (typeof progressDailyQuest === 'function') progressDailyQuest('expedition');
   return { ok: true };
 }
 
@@ -824,8 +891,8 @@ function purchaseItem(itemId) {
 
   const item = gameState.shop.dailyStock.find(i => i.id === itemId);
 
-  // Deduct gems
-  gameState.gems -= item.cost;
+  // Deduct gems (|| 0 guard prevents NaN if gems somehow became non-numeric)
+  gameState.gems = (gameState.gems || 0) - item.cost;
 
   // Mark purchased
   item.purchased = true;
@@ -843,6 +910,7 @@ function purchaseItem(itemId) {
   console.log('[Shop] Item effect applied (stub):', item.name, item.type);
 
   saveGame();
+  if (typeof progressDailyQuest === 'function') progressDailyQuest('shopPurchase');
   return { ok: true };
 }
 

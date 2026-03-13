@@ -149,6 +149,16 @@ html, body {
   padding: 0 3px;
 }
 .hub-topbar-icon img { width: 28px; height: 28px; object-fit: contain; image-rendering: pixelated; }
+#quest-badge {
+  position: absolute; top: -4px; right: -4px;
+  background: #F1C40F; color: #0D0010;
+  font-size: 9px; font-weight: bold;
+  min-width: 16px; height: 16px;
+  border-radius: 8px; display: none;
+  align-items: center; justify-content: center;
+  font-family: 'Courier New', monospace;
+  padding: 0 3px;
+}
 .hub-topbar-icon:hover { transform: scale(1.15); opacity: 1; filter: drop-shadow(0 0 6px var(--glow)); }
 
 /* ── MAIN CONTENT AREA ──────────────────────── */

@@ -553,9 +553,7 @@ function showResultsPanel(results) {
   againBtn.replaceWith(newAgain);
 
   newAdd.addEventListener('click', () => {
-    pendingResults.forEach(r => gameState.inventory.push(r));
-    saveGame();
-    pendingResults = [];
+    _commitPendingResults();
     overlay.classList.remove('visible');
     // Tutorial summon callback
     if (window._tutorialPullResolve) {
@@ -567,14 +565,21 @@ function showResultsPanel(results) {
 
   newAgain.addEventListener('click', () => {
     // Auto-add pending results to inventory so they aren't lost
-    if (pendingResults.length > 0) {
-      pendingResults.forEach(r => gameState.inventory.push(r));
-      saveGame();
-      pendingResults = [];
-    }
+    if (pendingResults.length > 0) _commitPendingResults();
     overlay.classList.remove('visible');
     refreshSummonContent();
   });
+}
+
+// ─── COMMIT PENDING RESULTS ───────────────────────────────
+// Single source of truth for flushing pendingResults → inventory.
+// Called from both [ ADD TO INVENTORY ] and [ SUMMON AGAIN ] paths.
+function _commitPendingResults() {
+  if (pendingResults.length === 0) return;
+  pendingResults.forEach(r => gameState.inventory.push(r));
+  saveGame();
+  pendingResults = [];
+  if (typeof progressDailyQuest === 'function') progressDailyQuest('summon');
 }
 
 function registerSceneSummon() {
