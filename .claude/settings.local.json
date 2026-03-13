@@ -14,7 +14,16 @@
       "Bash(git pull:*)",
       "Bash(cd /home/tanshu/Desktop/codingstuff/personal_projects/PickMeUp3.0/pick-me-up && python3 -m http.server 8080)",
       "Bash(cd /home/tanshu/Desktop/codingstuff/personal_projects/PickMeUp3.0/pick-me-up/server && node server.js)",
-      "Bash(claude --teleport session_01NgDqw5bzk5mnSEzfE4cWHx)"
+      "Bash(claude --teleport session_01NgDqw5bzk5mnSEzfE4cWHx)",
+      "Bash(git clone:*)",
+      "Bash(cd ~/.claude/skills/gstack && ./setup 2>&1)",
+      "Bash(mkdir -p /home/tanshu/Desktop/codingstuff/personal_projects/PickMeUp3.0/.claude/skills && cp -Rf ~/.claude/skills/gstack /home/tanshu/Desktop/codingstuff/personal_projects/PickMeUp3.0/.claude/skills/gstack && rm -rf /home/tanshu/Desktop/codingstuff/personal_projects/PickMeUp3.0/.claude/skills/gstack/.git && cd /home/tanshu/Desktop/codingstuff/personal_projects/PickMeUp3.0/.claude/skills/gstack && ./setup 2>&1)",
+      "Skill(plan-ceo-review)",
+      "Skill(plan-eng-review)",
+      "Bash(wc -l /home/tanshu/Desktop/codingstuff/personal_projects/PickMeUp3.0/pick-me-up/js/scenes/*.js /home/tanshu/Desktop/codingstuff/personal_projects/PickMeUp3.0/pick-me-up/js/systems/*.js /home/tanshu/Desktop/codingstuff/personal_projects/PickMeUp3.0/pick-me-up/js/gameState.js 2>/dev/null)",
+      "Skill(review)",
+      "Skill(browse)",
+      "Skill(ship)"
     ]
   }
 }
