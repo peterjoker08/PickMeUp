@@ -294,7 +294,7 @@ function _openPreCombat(floorNum, action) {
           onEnd: function (result) {
             setTimeout(() => {
               _towerViewFloor = gameState.tower.currentFloor;
-              showTowerScene();
+              resetHubMain();   // return to lobby after combat
             }, 200);
           },
         });
