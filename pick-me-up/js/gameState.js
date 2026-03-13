@@ -38,7 +38,11 @@ window.gameState = {
   },
   mailbox: [],
   items:   [],
-  firstPullDone: false,  synergy: { level: 0 },};
+  firstPullDone: false,  synergy: { level: 0 },
+  afkRewards: {
+    lastCollectTime: null,   // timestamp of last AFK reward collection / login
+  },
+};
 
 // ─── SAVE / LOAD ───────────────────────────────────────────
 function saveGame() {
@@ -61,6 +65,7 @@ function saveGame() {
     items:            gameState.items,
     firstPullDone:    gameState.firstPullDone,
     synergy:          gameState.synergy,
+    afkRewards:       gameState.afkRewards,
   }));
 }
 
@@ -104,6 +109,9 @@ function loadGame() {
       gameState.firstPullDone = !!d.firstPullDone || !!d.firstTenPullDone; // backwards compat
       if (d.synergy) {
         gameState.synergy = { level: typeof d.synergy.level === 'number' ? d.synergy.level : 0 };
+      }
+      if (d.afkRewards) {
+        gameState.afkRewards.lastCollectTime = d.afkRewards.lastCollectTime || null;
       }
       if (d.shop) {
         gameState.shop.dailyStock      = Array.isArray(d.shop.dailyStock)      ? d.shop.dailyStock      : [];
@@ -263,6 +271,16 @@ function migrateInventory() {
   if (!Array.isArray(gameState.mailbox)) { gameState.mailbox = []; changed = true; }
   if (!Array.isArray(gameState.items))   { gameState.items   = []; changed = true; }
   if (gameState.firstPullDone === undefined) { gameState.firstPullDone = false; changed = true; }
+
+  // ── AFK Rewards migration ──
+  if (!gameState.afkRewards) {
+    gameState.afkRewards = { lastCollectTime: null };
+    changed = true;
+  }
+  if (typeof gameState.afkRewards.lastCollectTime === 'undefined') {
+    gameState.afkRewards.lastCollectTime = null;
+    changed = true;
+  }
 
   // ── Tower migration ──
   if (!gameState.tower) {

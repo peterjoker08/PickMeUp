@@ -1,0 +1,221 @@
+================================================================================
+                         PICKMEUP 3.0 - FINAL GAME IDEA
+                      Comprehensive Game Review & Improvements
+================================================================================
+
+## PROJECT STRUCTURE
+
+/home/user/PickMeUp/pick-me-up/
+├── index.html                 # Main entry point with full UI layout
+├── css/                       # Styling (style.css)
+├── assets/                    # Game assets
+│   ├── mainArt/              # UI graphics (energy, gems, gold, shop icons, etc.)
+│   ├── character_assets/     # Character sprites and animations
+│   ├── maps/                 # Tilemap data (Pixel Crawler Free Pack, LDtk JSON)
+│   └── tilesets/             # Tileset resources
+├── js/                        # All game logic (main codebase)
+│   ├── gameState.js          # CORE: Global game state + save/load
+│   ├── main.js               # Canvas setup + entry point
+│   ├── debug.js              # Debug mode toggle (Ctrl+Shift+D)
+│   ├── scenes/               # UI scene modules (11 total)
+│   ├── systems/              # Game mechanics (5 systems)
+│   ├── phaser/               # Phaser 3 scene integration
+│   └── ui/helpers.js         # Shared UI utilities + constants
+├── server/                    # Sprite generation server (Node.js)
+│   ├── server.js             # Express API for LPC sprite generation
+│   ├── db.js                 # Character database (SQLite)
+│   ├── lpc-sheets.js         # LPC layer parsing
+│   ├── characters.json       # Character storage
+│   └── package.json          # Dependencies (Express, Groq SDK, canvas)
+└── tests/                     # Test files
+
+================================================================================
+                           CORE GAME SYSTEMS ANALYSIS
+================================================================================
+
+### 1. GACHA (SUMMON) SYSTEM
+- 3 banners: Standard, Limited (5★ Shay Lathasterie), Weapon
+- 7 rarity tiers (1★-7★)
+- Pity system per banner (tracked in gameState.banners)
+- BASE_RATES array: [30%, 25%, 22%, 15%, 6%, 1.5%, 0.5%]
+- Talent generation (0-10 scale, rarity-dependent distribution)
+- Base stats by rarity (starting STR/INT/HP/AGI)
+- Guaranteed tutorial hero (Shay - 4★ Knight)
+
+### 2. HEROES SYSTEM
+- Hero properties: id, name, rarity, class, level, exp, talent
+- Stats: strength, intelligence, health, agility, critRate, critDamage, reactionTime
+- Dual weapon slots (mainHand, offHand)
+- Weapon proficiency tracking with Beginner tier unlock at 10 battles or 3 dungeon runs
+- Status effects array
+- Skills array (proficiency skills, class-specific)
+- Party system (ordered array of 6 hero IDs)
+- inParty/inDungeon flags
+
+### 3. TOWER OF TRIALS (100 Floors)
+- Floor types: normal (every floor), miniboss (floor % 5), boss (floor % 10)
+- Floor progression: currentFloor tracks highest cleared floor
+- Revisit system with claimed rewards tracking
+- Combat integration with arena scene
+
+### 4. EXPEDITION/DUNGEON SYSTEM
+- Active runs with: id, dungeonId, heroIds[], startTime, duration, status
+- Completed runs moved to completedRuns array
+- Daily bonus dungeon selection (resets at midnight)
+- Reward system framework exists
+- Hero inDungeon flag prevents party/synthesis while active
+
+### 5. SYNTHESIS SYSTEM
+- Sacrifice one hero to boost another
+- Captures snapshot of sacrifice hero before deletion
+- Unequips weapons automatically
+- Stat boosts calculation
+- Skill inheritance tracking
+- Talent influence tracking
+- Records full history with baseHeroId, sacrificeHeroId, statBoosts
+
+### 6. PROMOTION SYSTEM (Rank-up)
+- Promotes hero from 1★ to 7★
+- Recalculates base stats on promotion
+- Unlocks memory (stub)
+- Unlocks skills (stub)
+- Material consumption stub
+
+### 7. SHOP SYSTEM
+- Daily shop tab (resets at midnight UTC)
+- Special shop tab (placeholder)
+- Purchase history tracking
+- Gem currency spending
+- purchaseHistory records: itemId, itemName, type, cost, timestamp
+
+### 8. COMBAT ENGINE
+- Tick-based auto-battle: 100ms ticks, 1000ms action threshold
+- Hero combat units: HP, STR, INT, AGI, critRate, critDamage, reactionTime
+- Enemy units from enemy database
+- Formation bonuses: front row (+15% DEF, -5% ATK), back row (+10% ATK, -10% DEF)
+- Synergy system (0-10 level) with scaling ATK/DEF/SPD bonuses
+- Energy system for ultimates (100 threshold)
+- Status effects application
+- 600-tick hard combat timeout (60 seconds)
+- Talent-based mechanics: resistChance (high talent), panicChance (low talent)
+
+### 9. MAILBOX REWARD SYSTEM
+- Mail objects: id, from, subject, body, rewards {gems, gold, items[]}, read, claimed, expires, timestamp
+- sendMail() function for system notifications
+- claimMail() applies rewards (gems, gold, items to inventory)
+- deleteMail() removes mail
+- Mail expiration tracking (optional)
+- updateMailBadge() shows unclaimed count
+
+### 10. WEAPON SYSTEM
+- 7 weapon types: Sword, Staff, Bow, Dagger, Shield, Spear, Axe
+- Rarity-dependent stat generation (flatSTR, flatINT, flatHP, flatAGI, pctSTR, pctINT, pctHP, pctAGI)
+- Flat stat ranges by rarity (e.g., 1★: 3-8, 7★: 160-250)
+- Percentage bonus ranges (3★+: 1-3%, 7★: 8-14%)
+- Weapon type-specific stat distributions (Sword → STR+AGI, Staff → INT, etc.)
+- Weapon proficiency: tracks battles/dungeon runs per weapon type
+- Active penalty system: 35% stat reduction when using unfamiliar weapon type
+
+### 11. INVENTORY & MATERIALS
+- Three inventory types: heroes, weapons, materials/items
+- Items array for consumables/resources
+- Materials array for crafting
+- EquippedTo tracking on weapons
+
+### 12. PLAYER PROGRESSION
+- Gems (premium currency)
+- Gold (soft currency)
+- Player nickname (2-6 alphanumeric)
+- Tutorial progression (tutorialStep, tutorialAccepted)
+- Synergy level (0-10 system)
+
+================================================================================
+                           GAME STATE MANAGEMENT
+================================================================================
+
+Architecture:
+- Single global object: window.gameState (global singleton)
+- localStorage persistence: saveGame() → JSON serialization, loadGame() → JSON parsing
+- Save triggers: Every state mutation calls saveGame()
+- Migration system: migrateInventory() handles backward compatibility on load
+- Auto-checks: checkDungeonResets(), checkShopReset() on relevant scene entry
+
+Game State Structure:
+{
+  playerNickname, tutorialAccepted, tutorialStep,
+  gems, gold, currentFloor,
+  inventory[], party[], banners{},
+  tower{ currentFloor, clearedFloors[], floorRevisitClaimed{}, lastRevisitReset },
+  materials[],
+  dungeons{ activeRuns[], completedRuns[], dailyBonus{ dungeonId, lastReset } },
+  synthesisHistory[],
+  shop{ dailyStock[], lastStockReset, purchaseHistory[] },
+  mailbox[],
+  items[],
+  firstPullDone, synergy{ level }
+}
+
+Helper Functions Exported:
+- Party: addToParty(), removeFromParty(), swapPartySlot(), getPartyHeroes()
+- Equipment: equipWeapon(), unequipWeapon(), getEffectiveStats(), incrementWeaponFamiliarity()
+- Tower: recordFloorClear(), getFloorType(), isFloorCleared(), isFloorUnlocked()
+- Dungeons: dispatchDungeon(), collectDungeon(), getRunTimeRemaining(), isRunComplete()
+- Synthesis: canSynthesize(), performSynthesis()
+- Promotion: canPromote(), performPromotion()
+- Shop: canPurchase(), purchaseItem(), checkShopReset()
+
+================================================================================
+                         DAILY QUEST SYSTEM
+================================================================================
+
+Daily Quests (Reset Daily at Midnight UTC):
+
+1. Complete Tower Challenge x1
+2. Summon in the Angel's Blessing x1
+3. Claim Instant Tower Rewards x1
+4. Participate in Expedition x1
+5. Give Support Hero x1
+6. Claim Support Hero x1
+7. Gift a Hero x1
+8. Purchase from Shop x1
+9. Talk to one Hero x1
+
+================================================================================
+                     FEATURES TO IMPLEMENT / IMPROVE
+================================================================================
+
+### AFK IDLE REWARDS SYSTEM
+- Passive gold/exp generation while offline
+- Calculation based on time elapsed since last login
+- Rewards scale with tower progression (highest floor cleared)
+- Party power multiplier for idle earnings
+- Cap on maximum AFK time (e.g., 12-24 hours)
+- Welcome back screen showing accumulated rewards
+- Quick collect button for instant claim
+
+### DAILY QUEST TRACKING
+- Quest progress tracked per day (resets at midnight UTC)
+- Visual progress indicators (0/1 for each quest)
+- Reward tiers: individual quest rewards + milestone bonuses
+- Daily quest completion counter
+- Bonus rewards for completing all 9 daily quests
+
+### SUPPORT HERO SYSTEM
+- Players can set a hero as "Support Hero" for others
+- Borrow other players' support heroes for combat
+- Give/Claim support hero daily actions
+
+### HERO GIFTING SYSTEM
+- Gift heroes to other players
+- Daily gift limit
+- Gift history tracking
+
+### HERO INTERACTION (Talk to Hero)
+- Interact with heroes in the hub/manor
+- Affinity/friendship system
+- Dialogue trees based on hero personality
+- Rewards for daily interactions
+
+================================================================================
+                              END OF DOCUMENT
+================================================================================

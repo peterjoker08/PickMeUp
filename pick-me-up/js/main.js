@@ -60,7 +60,16 @@ registerSceneArena();
   if (loadGame()) {
     document.getElementById('boot-ui').style.display = 'none';
     showHub();
+    // Check AFK idle rewards after hub is shown
+    if (typeof AfkRewards !== 'undefined') {
+      AfkRewards.checkAfkRewards();
+    }
   } else {
     runIntroFlow();
+  }
+
+  // Start AFK timer for all sessions (stamps time periodically + on unload)
+  if (typeof AfkRewards !== 'undefined') {
+    AfkRewards.startAfkTimer();
   }
 })();
