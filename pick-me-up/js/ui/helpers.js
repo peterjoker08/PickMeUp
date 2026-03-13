@@ -54,7 +54,8 @@ document.addEventListener('keydown', e => {
   const uiLayer = document.getElementById('ui-layer');
   if (!uiLayer) return;
 
-  // Ordered from highest z-index to lowest — close the topmost one only
+  // Ordered from highest z-index to lowest — close the topmost one only.
+  // IMPORTANT: this list is maintained manually; add new overlays in z-index order.
   const knownOverlays = [
     'combat-overlay',
     'arena-floor-picker',
@@ -63,6 +64,7 @@ document.addEventListener('keydown', e => {
     'hero-picker-overlay',
     'tower-combat-overlay',
     'tower-precombat-overlay',
+    'affinity-panel-overlay',   // z-index 1650
     'synth-result-overlay',
     'synth-confirm-overlay',
     'synth-picker-overlay',

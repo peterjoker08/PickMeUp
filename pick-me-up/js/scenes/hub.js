@@ -13,7 +13,8 @@ function showHub() {
   document.getElementById('hub-player-name').textContent = gameState.playerNickname;
   updateGemsDisplay();
   updateGoldDisplay();
-  if (typeof updateMailBadge === 'function') updateMailBadge();
+  if (typeof updateMailBadge  === 'function') updateMailBadge();
+  if (typeof updateQuestBadge === 'function') updateQuestBadge();
   resetHubMain();
 }
 
@@ -123,6 +124,7 @@ function hubNav(name) {
   else if (name === 'Dungeon')    showDungeonsScene();
   else if (name === 'Arena')      showArenaScene();
   else if (name === 'Tower')      showTowerScene();
+  else if (name === 'Quest')      showQuestScene();
   else if (name === 'Shop')       showShopScene();
   else if (name === 'Synthesis')  showSynthesisScene();
   else if (name === 'Promotion')  showPromotionScene();

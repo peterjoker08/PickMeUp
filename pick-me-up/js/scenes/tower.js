@@ -73,13 +73,28 @@ function _buildFloorPanel(floorNum, isPreview) {
           onmouseover="this.style.boxShadow='0 0 12px #7B2FBE'"
           onmouseout="this.style.boxShadow=''">[ CHALLENGE FLOOR ]</button>`;
     } else if (cleared) {
+      const today        = new Date().toISOString().slice(0, 10);
+      const dailyClaimed = gameState.tower.lastRevisitReset === today;
+      const claimBorder  = dailyClaimed ? '#333348' : '#4CAF50';
+      const claimColor   = dailyClaimed ? '#333348' : '#FFFFFF';
+      const claimCursor  = dailyClaimed ? 'not-allowed' : 'pointer';
+      const claimLabel   = dailyClaimed ? '[ ✓ REWARD CLAIMED ]' : '[ CLAIM DAILY REWARD ]';
       actionHTML = `
-        <button class="tower-action-btn" data-floor="${floorNum}" data-action="revisit"
-          style="background:#1A0025;border:2px solid #C0C0D0;color:#FFFFFF;
-                 font-family:'Courier New',monospace;font-size:13px;padding:10px 24px;
-                 cursor:pointer;letter-spacing:1px;margin-top:18px;transition:box-shadow 0.2s"
-          onmouseover="this.style.boxShadow='0 0 12px #7B2FBE'"
-          onmouseout="this.style.boxShadow=''">[ REVISIT ]</button>`;
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:18px">
+          <button class="tower-action-btn" data-floor="${floorNum}" data-action="revisit"
+            style="background:#1A0025;border:2px solid #C0C0D0;color:#FFFFFF;
+                   font-family:'Courier New',monospace;font-size:13px;padding:10px 24px;
+                   cursor:pointer;letter-spacing:1px;transition:box-shadow 0.2s"
+            onmouseover="this.style.boxShadow='0 0 12px #7B2FBE'"
+            onmouseout="this.style.boxShadow=''">[ REVISIT ]</button>
+          <button class="tower-daily-claim-btn" data-floor="${floorNum}"
+            style="background:#1A0025;border:2px solid ${claimBorder};color:${claimColor};
+                   font-family:'Courier New',monospace;font-size:12px;padding:8px 20px;
+                   cursor:${claimCursor};letter-spacing:1px;transition:box-shadow 0.2s"
+            ${dailyClaimed ? 'disabled' : ''}
+            onmouseover="if(!this.disabled)this.style.boxShadow='0 0 10px #4CAF50'"
+            onmouseout="this.style.boxShadow=''">${claimLabel}</button>
+        </div>`;
     }
   }
 
@@ -148,6 +163,14 @@ function _renderTowerPanels() {
       const floor  = parseInt(btn.dataset.floor, 10);
       const action = btn.dataset.action;
       _openPreCombat(floor, action);
+    });
+  });
+
+  // Attach daily reward claim listeners
+  container.querySelectorAll('.tower-daily-claim-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.disabled = true;
+      _claimTowerDailyReward(parseInt(btn.dataset.floor, 10));
     });
   });
 }
@@ -311,6 +334,77 @@ function _closePreCombat() {
   panel.style.opacity    = '0';
   panel.style.transform  = 'translateY(-12px)';
   setTimeout(() => overlay.remove(), 170);
+}
+
+// ─── TOWER DAILY REWARD ────────────────────────────────────
+// One claim per day (uses lastRevisitReset as ISO-date flag).
+// Rewards auto-applied via popup — no mail (mail is for quest rewards only).
+function _claimTowerDailyReward(floorNum) {
+  const today = new Date().toISOString().slice(0, 10);
+  if (gameState.tower.lastRevisitReset === today) return;  // double-claim guard
+
+  const gems = 30;
+  const gold = 300;
+  gameState.gems = (gameState.gems || 0) + gems;
+  gameState.gold = (gameState.gold || 0) + gold;
+  gameState.tower.lastRevisitReset = today;
+  saveGame();
+
+  if (typeof updateGemsDisplay === 'function') updateGemsDisplay();
+  if (typeof updateGoldDisplay === 'function') updateGoldDisplay();
+  if (typeof progressDailyQuest === 'function') progressDailyQuest('towerRewards');
+
+  // Small popup — auto-applied, no claim action needed
+  const overlay = document.createElement('div');
+  overlay.id = 'tower-reward-overlay';
+  overlay.style.cssText =
+    'position:fixed;inset:0;z-index:1900;display:flex;align-items:center;' +
+    'justify-content:center;background:rgba(0,0,0,0.75);';
+
+  const panel = document.createElement('div');
+  panel.style.cssText =
+    'background:#12001A;border:2px solid #4CAF50;' +
+    'box-shadow:0 0 20px rgba(76,175,80,0.4);' +
+    'padding:28px 36px;font-family:\'Courier New\',monospace;text-align:center;min-width:280px;' +
+    'opacity:0;transform:translateY(16px);transition:opacity 0.22s,transform 0.22s;';
+
+  panel.innerHTML = `
+    <div style="color:#4CAF50;font-size:15px;letter-spacing:3px;margin-bottom:16px">[ DAILY REWARD ]</div>
+    <div style="color:#E8D5FF;font-size:13px;margin-bottom:6px">Floor ${floorNum} — Cleared</div>
+    <div style="color:#FFFFFF;font-size:18px;margin:14px 0">💎 +${gems} Gems</div>
+    <div style="color:#FFFFFF;font-size:18px;margin-bottom:20px">🪙 +${gold} Gold</div>
+    <div style="color:#888899;font-size:11px;letter-spacing:1px;margin-bottom:18px">Rewards added to your account</div>
+    <button id="tower-reward-ok-btn"
+      style="background:#1A0025;border:2px solid #4CAF50;color:#FFFFFF;
+             font-family:'Courier New',monospace;font-size:13px;padding:9px 28px;
+             cursor:pointer;letter-spacing:1px;transition:box-shadow 0.2s"
+      onmouseover="this.style.boxShadow='0 0 12px #4CAF50'"
+      onmouseout="this.style.boxShadow=''">[ OK ]</button>`;
+
+  overlay.appendChild(panel);
+  document.getElementById('ui-layer').appendChild(overlay);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    panel.style.opacity   = '1';
+    panel.style.transform = 'translateY(0)';
+  }));
+
+  function _closeTowerRewardPopup() {
+    const ov = document.getElementById('tower-reward-overlay');
+    if (!ov) return;
+    const pn = ov.firstElementChild;
+    pn.style.transition = 'opacity 0.16s ease, transform 0.16s ease';
+    pn.style.opacity    = '0';
+    pn.style.transform  = 'translateY(-12px)';
+    setTimeout(() => {
+      ov.remove();
+      // Refresh panel to show claimed state
+      _renderTowerPanels();
+      _renderTowerNav();
+    }, 170);
+  }
+
+  panel.querySelector('#tower-reward-ok-btn').addEventListener('click', _closeTowerRewardPopup);
+  overlay.addEventListener('click', e => { if (e.target === overlay) _closeTowerRewardPopup(); });
 }
 
 // ─── REGISTER ─────────────────────────────────────────────

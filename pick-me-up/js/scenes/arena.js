@@ -366,7 +366,11 @@
         }
       });
 
-      if (!_isArenaMode) recordFloorClear(_floorNum);
+      if (!_isArenaMode) {
+        recordFloorClear(_floorNum);
+        // Intentional: any tower fight win (including revisits) counts as the daily challenge.
+        if (typeof progressDailyQuest === 'function') progressDailyQuest('towerChallenge');
+      }
       updateGemsDisplay();
       updateGoldDisplay();
       saveGame();
