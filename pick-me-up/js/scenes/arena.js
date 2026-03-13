@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════
 // ARENA SCENE — AFK Journey-style auto-battle combat
 // ═══════════════════════════════════════════════════════════
-// Full-screen combat UI with:
-//   - Battlefield (hero sprites vs enemy sprites)
+// Full-screen combat overlay with:
+//   - Canvas battlefield (BattleRenderer — animated pixel sprites)
 //   - Hero cards at bottom (AFK Journey-style)
 //   - Auto-battle with speed controls
 //   - Combat log + floating damage numbers
@@ -17,7 +17,6 @@
   var _floorNum        = 0;
   var _isArenaMode     = false;   // true = arena, false = tower combat
   var _onCombatEnd     = null;    // callback when combat ends
-  var _damageFloats    = [];      // floating damage numbers
 
   // ═══════════════════════════════════════════════════════════
   // PUBLIC: Launch combat (called from Tower or Arena)
@@ -30,7 +29,6 @@
     _combatSpeed = 1;
     _combatPaused = false;
     _logIndex    = 0;
-    _damageFloats = [];
 
     var party   = getPartyHeroes().filter(Boolean);
     var enemies = getEnemiesForFloor(floorNum);
@@ -46,7 +44,6 @@
   // RENDER: Full-screen combat overlay (AFK Journey layout)
   // ═══════════════════════════════════════════════════════════
   function _renderCombatUI() {
-    // Remove any existing combat overlay
     var existing = document.getElementById('combat-overlay');
     if (existing) existing.remove();
 
@@ -72,12 +69,9 @@
         '</div>' +
       '</div>' +
 
-      '<!-- BATTLEFIELD -->' +
+      '<!-- BATTLEFIELD (canvas rendered) -->' +
       '<div class="combat-battlefield" id="combat-battlefield">' +
-        '<div class="combat-field-heroes" id="combat-field-heroes"></div>' +
-        '<div class="combat-field-vs">VS</div>' +
-        '<div class="combat-field-enemies" id="combat-field-enemies"></div>' +
-        '<div class="combat-floats" id="combat-floats"></div>' +
+        '<canvas id="battle-canvas" style="width:100%;height:100%;image-rendering:pixelated;image-rendering:crisp-edges;display:block"></canvas>' +
       '</div>' +
 
       '<!-- COMBAT LOG -->' +
@@ -93,12 +87,12 @@
 
     document.getElementById('ui-layer').appendChild(overlay);
 
-    // Render initial unit positions
-    _renderFieldUnits();
-    _renderHeroCards();
+    // Init the canvas battle renderer
+    var battleCanvas = document.getElementById('battle-canvas');
+    BattleRenderer.init(battleCanvas, _combatInstance);
 
-    // Deferred sprite upgrade — retry loading sprites that weren't ready
-    _deferredSpriteUpgrade();
+    // Render hero cards
+    _renderHeroCards();
 
     // Attach controls
     document.getElementById('combat-speed-btn').addEventListener('click', _cycleSpeed);
@@ -113,195 +107,6 @@
     });
   }
 
-  // ─── FIELD UNITS (battlefield sprites) ──────────────────
-  function _renderFieldUnits() {
-    var heroField  = document.getElementById('combat-field-heroes');
-    var enemyField = document.getElementById('combat-field-enemies');
-    if (!heroField || !enemyField) return;
-
-    heroField.innerHTML = '';
-    enemyField.innerHTML = '';
-
-    _combatInstance.playerUnits.forEach(function (unit) {
-      heroField.appendChild(_buildFieldUnit(unit, 'hero'));
-    });
-
-    _combatInstance.enemyUnits.forEach(function (unit) {
-      enemyField.appendChild(_buildFieldUnit(unit, 'enemy'));
-    });
-  }
-
-  function _buildFieldUnit(unit, type) {
-    var col = type === 'hero'
-      ? (RARITY_BORDER[unit.rarity] || '#C0C0D0')
-      : (unit._enemyRef && unit._enemyRef.icon ? '#FF6666' : '#FF4444');
-
-    var el = document.createElement('div');
-    el.className = 'combat-field-unit' + (unit.alive ? '' : ' dead');
-    el.id = 'field-unit-' + unit.id;
-    el.dataset.unitId = unit.id;
-
-    var hpPct = Math.max(0, Math.round((unit.currentHP / unit.maxHP) * 100));
-    var hpColor = hpPct > 60 ? '#4CAF50' : hpPct > 30 ? '#FFA500' : '#FF4444';
-    var icon = type === 'enemy' && unit._enemyRef ? unit._enemyRef.icon : '🛡';
-
-    // Check for LPC sprite
-    var spriteId = null;
-    if (type === 'hero' && unit._heroRef && unit._heroRef.spriteId) spriteId = unit._heroRef.spriteId;
-    if (type === 'enemy' && unit._enemyRef && unit._enemyRef.spriteId) spriteId = unit._enemyRef.spriteId;
-
-    if (spriteId && typeof SpriteGen !== 'undefined') {
-      // Use canvas for LPC sprite
-      el.innerHTML =
-        '<div class="field-unit-icon" style="border-color:' + col + ';overflow:hidden">' +
-          '<canvas class="field-unit-sprite" width="64" height="64" data-sprite-id="' + spriteId + '" data-flip="' + (type === 'enemy' ? 'true' : 'false') + '" style="width:100%;height:100%;image-rendering:pixelated"></canvas>' +
-        '</div>' +
-        '<div class="field-unit-name">' + escHtml(unit.name) + '</div>' +
-        '<div class="field-unit-hp-bar">' +
-          '<div class="field-unit-hp-fill" style="width:' + hpPct + '%;background:' + hpColor + '"></div>' +
-        '</div>';
-
-      // Load and draw the sprite async
-      SpriteGen.getSpriteImage(spriteId).then(function (img) {
-        if (!img) return;
-        var canvas = el.querySelector('.field-unit-sprite');
-        if (!canvas) return;
-        var ctx = canvas.getContext('2d');
-        ctx.imageSmoothingEnabled = false;
-        // Idle pose = idle_down row 24, frame 0
-        var flip = type === 'enemy';
-        SpriteGen.drawLPCFrame(ctx, img, 'idle', 0, 0, 0, 64, 64, flip);
-
-        // Set up idle animation
-        var frame = 0;
-        var animId = setInterval(function () {
-          if (!document.body.contains(canvas)) { clearInterval(animId); return; }
-          frame++;
-          ctx.clearRect(0, 0, 64, 64);
-          SpriteGen.drawLPCFrame(ctx, img, 'idle', frame, 0, 0, 64, 64, flip);
-        }, 180);
-      });
-    } else {
-      el.innerHTML =
-        '<div class="field-unit-icon" style="border-color:' + col + '">' +
-          '<span>' + icon + '</span>' +
-        '</div>' +
-        '<div class="field-unit-name">' + escHtml(unit.name) + '</div>' +
-        '<div class="field-unit-hp-bar">' +
-          '<div class="field-unit-hp-fill" style="width:' + hpPct + '%;background:' + hpColor + '"></div>' +
-        '</div>';
-    }
-
-    return el;
-  }
-
-  /** Retry upgrading emoji placeholders to LPC sprites for units whose spriteId arrived late */
-  function _deferredSpriteUpgrade() {
-    if (!_combatInstance || typeof SpriteGen === 'undefined') return;
-    var retries = 0;
-    var maxRetries = 10;
-    var interval = setInterval(function () {
-      retries++;
-      if (!_combatInstance || !document.getElementById('combat-overlay')) {
-        clearInterval(interval);
-        return;
-      }
-
-      var allUnits = (_combatInstance.playerUnits || []).concat(_combatInstance.enemyUnits || []);
-      var upgraded = false;
-
-      allUnits.forEach(function (unit) {
-        var spriteId = null;
-        var type = unit.isHero ? 'hero' : 'enemy';
-        if (type === 'hero' && unit._heroRef && unit._heroRef.spriteId) spriteId = unit._heroRef.spriteId;
-        if (type === 'enemy' && unit._enemyRef && unit._enemyRef.spriteId) spriteId = unit._enemyRef.spriteId;
-        if (!spriteId) return;
-
-        var fieldEl = document.getElementById('field-unit-' + unit.id);
-        if (!fieldEl) return;
-        // Already has a canvas? Skip
-        if (fieldEl.querySelector('.field-unit-sprite')) return;
-
-        // Upgrade this unit's icon to a sprite canvas
-        var iconDiv = fieldEl.querySelector('.field-unit-icon');
-        if (!iconDiv) return;
-
-        var col = type === 'hero'
-          ? (RARITY_BORDER[unit.rarity] || '#C0C0D0')
-          : '#FF6666';
-        iconDiv.style.overflow = 'hidden';
-        iconDiv.innerHTML = '<canvas class="field-unit-sprite" width="64" height="64" data-sprite-id="' + spriteId + '" data-flip="' + (type === 'enemy' ? 'true' : 'false') + '" style="width:100%;height:100%;image-rendering:pixelated"></canvas>';
-
-        var flip = type === 'enemy';
-        SpriteGen.getSpriteImage(spriteId).then(function (img) {
-          if (!img) return;
-          var canvas = iconDiv.querySelector('.field-unit-sprite');
-          if (!canvas) return;
-          var ctx = canvas.getContext('2d');
-          ctx.imageSmoothingEnabled = false;
-          SpriteGen.drawLPCFrame(ctx, img, 'idle', 0, 0, 0, 64, 64, flip);
-
-          var frame = 0;
-          var animId = setInterval(function () {
-            if (!document.body.contains(canvas)) { clearInterval(animId); return; }
-            frame++;
-            ctx.clearRect(0, 0, 64, 64);
-            SpriteGen.drawLPCFrame(ctx, img, 'idle', frame, 0, 0, 64, 64, flip);
-          }, 180);
-        });
-
-        upgraded = true;
-      });
-
-      // Also upgrade hero card portraits
-      if (upgraded) {
-        var cardContainer = document.getElementById('combat-hero-cards');
-        if (cardContainer) {
-          _combatInstance.playerUnits.forEach(function (unit) {
-            if (!unit._heroRef || !unit._heroRef.spriteId) return;
-            var card = document.getElementById('combat-card-' + unit.id);
-            if (!card || card.querySelector('.combat-card-sprite')) return;
-            var artEl = card.querySelector('.combat-card-art');
-            if (!artEl) return;
-            var canvas = document.createElement('canvas');
-            canvas.className = 'combat-card-sprite';
-            canvas.width = 64;
-            canvas.height = 64;
-            canvas.dataset.spriteId = unit._heroRef.spriteId;
-            canvas.style.cssText = 'width:100%;height:100%;image-rendering:pixelated';
-            artEl.replaceWith(canvas);
-            SpriteGen.getSpriteImage(unit._heroRef.spriteId).then(function (img) {
-              if (!img) return;
-              var ctx = canvas.getContext('2d');
-              ctx.imageSmoothingEnabled = false;
-              SpriteGen.drawLPCFrame(ctx, img, 'idle', 0, 0, 0, 64, 64, false);
-            });
-          });
-        }
-      }
-
-      if (retries >= maxRetries) clearInterval(interval);
-    }, 500);
-  }
-
-  function _updateFieldUnit(unit) {
-    var el = document.getElementById('field-unit-' + unit.id);
-    if (!el) return;
-
-    if (!unit.alive) {
-      el.classList.add('dead');
-      return;
-    }
-
-    var hpPct = Math.max(0, Math.round((unit.currentHP / unit.maxHP) * 100));
-    var hpColor = hpPct > 60 ? '#4CAF50' : hpPct > 30 ? '#FFA500' : '#FF4444';
-    var fill = el.querySelector('.field-unit-hp-fill');
-    if (fill) {
-      fill.style.width = hpPct + '%';
-      fill.style.background = hpColor;
-    }
-  }
-
   // ─── HERO CARDS (AFK Journey bottom bar) ────────────────
   function _renderHeroCards() {
     var container = document.getElementById('combat-hero-cards');
@@ -310,55 +115,6 @@
 
     _combatInstance.playerUnits.forEach(function (unit) {
       container.appendChild(_buildHeroCard(unit));
-    });
-
-    // Load LPC sprites into hero card canvases
-    _loadSpriteCanvases(container);
-  }
-
-  /** Load LPC sprites for any .combat-card-sprite or .field-unit-sprite canvases in el */
-  function _loadSpriteCanvases(el) {
-    if (typeof SpriteGen === 'undefined') return;
-    var canvases = el.querySelectorAll('canvas[data-sprite-id]');
-    canvases.forEach(function (canvas) {
-      var spriteId = canvas.dataset.spriteId;
-      if (!spriteId) return;
-      SpriteGen.getSpriteImage(spriteId).then(function (img) {
-        if (!img) return;
-        var ctx = canvas.getContext('2d');
-        ctx.imageSmoothingEnabled = false;
-        SpriteGen.drawLPCFrame(ctx, img, 'idle', 0, 0, 0, canvas.width, canvas.height, false);
-      });
-    });
-  }
-
-  /** Play a short LPC animation (attack/hurt) on a field unit's sprite canvas, then return to idle */
-  function _playLPCAnimation(fieldEl, animName, flip) {
-    if (typeof SpriteGen === 'undefined') return;
-    var canvas = fieldEl.querySelector('.field-unit-sprite');
-    if (!canvas) return;
-    var spriteId = canvas.dataset.spriteId;
-    if (!spriteId) return;
-
-    SpriteGen.getSpriteImage(spriteId).then(function (img) {
-      if (!img) return;
-      var ctx = canvas.getContext('2d');
-      ctx.imageSmoothingEnabled = false;
-      var frame = 0;
-      var totalFrames = animName === 'hurt' ? 6 : 6;
-      var interval = animName === 'hurt' ? 80 : 100;
-
-      var animId = setInterval(function () {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        SpriteGen.drawLPCFrame(ctx, img, animName, frame, 0, 0, canvas.width, canvas.height, flip);
-        frame++;
-        if (frame >= totalFrames) {
-          clearInterval(animId);
-          // Return to idle
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          SpriteGen.drawLPCFrame(ctx, img, 'idle', 0, 0, 0, canvas.width, canvas.height, flip);
-        }
-      }, interval);
     });
   }
 
@@ -384,18 +140,18 @@
       });
     }
 
-    // Talent indicator
     var talentCol = talentColor(unit.talent);
 
-    // Portrait: use LPC sprite if available
-    var portraitHTML = '<div class="combat-card-art">[ Art ]</div>';
-    if (unit._heroRef && unit._heroRef.spriteId && typeof SpriteGen !== 'undefined') {
-      portraitHTML = '<canvas class="combat-card-sprite" width="64" height="64" data-sprite-id="' + unit._heroRef.spriteId + '" style="width:100%;height:100%;image-rendering:pixelated"></canvas>';
-    }
+    // Class icon portrait
+    var classIcons = {
+      Warrior: '⚔', Mage: '🔮', Ranger: '🏹', Healer: '✨',
+      Tank: '🛡', Assassin: '🗡', Knight: '⚔', Cleric: '✨',
+    };
+    var icon = classIcons[unit.class] || '⚔';
 
     card.innerHTML =
       '<div class="combat-card-portrait" style="border-bottom-color:' + col + '">' +
-        portraitHTML +
+        '<div class="combat-card-art" style="font-size:28px;display:flex;align-items:center;justify-content:center">' + icon + '</div>' +
         '<div class="combat-card-stars" style="color:' + col + '">' + stars + '</div>' +
       '</div>' +
       '<div class="combat-card-info">' +
@@ -456,28 +212,6 @@
     if (enVal) enVal.textContent = unit.energy + '/' + unit.maxEnergy;
   }
 
-  // ─── FLOATING DAMAGE NUMBERS ────────────────────────────
-  function _spawnDamageFloat(unitId, damage, isCrit, isPanic, side) {
-    var unitEl = document.getElementById('field-unit-' + unitId);
-    var container = document.getElementById('combat-floats');
-    if (!unitEl || !container) return;
-
-    var rect = unitEl.getBoundingClientRect();
-    var containerRect = container.getBoundingClientRect();
-
-    var floatEl = document.createElement('div');
-    floatEl.className = 'combat-damage-float' + (isCrit ? ' crit' : '') + (isPanic ? ' panic' : '');
-    floatEl.textContent = (isCrit ? '💥 ' : '') + '-' + damage + (isPanic ? ' PANIC' : '');
-
-    var offsetX = (rect.left - containerRect.left) + rect.width / 2 - 20 + (Math.random() * 30 - 15);
-    var offsetY = (rect.top - containerRect.top) - 10;
-    floatEl.style.left = offsetX + 'px';
-    floatEl.style.top = offsetY + 'px';
-
-    container.appendChild(floatEl);
-    setTimeout(function () { floatEl.remove(); }, 1200);
-  }
-
   // ─── COMBAT LOG ─────────────────────────────────────────
   function _updateLogBar(message) {
     var logText = document.getElementById('combat-log-text');
@@ -504,49 +238,31 @@
 
         if (entry.type === 'attack') {
           _updateLogBar(entry.message);
-          _spawnDamageFloat(entry.defenderId, entry.damage, entry.isCrit, entry.isPanic, entry.defenderSide);
 
-          // Update unit visuals
+          // Trigger canvas battle animations
+          BattleRenderer.onAttack(
+            entry.attackerId, entry.defenderId,
+            entry.damage, entry.isCrit, entry.isPanic
+          );
+
+          // Update hero cards
           var defender = _combatInstance.allUnits.find(function (u) { return u.id === entry.defenderId; });
-          if (defender) {
-            _updateFieldUnit(defender);
-            if (defender.isHero) _updateHeroCard(defender);
-          }
+          if (defender && defender.isHero) _updateHeroCard(defender);
           var attacker = _combatInstance.allUnits.find(function (u) { return u.id === entry.attackerId; });
-          if (attacker) {
-            _updateFieldUnit(attacker);
-            if (attacker.isHero) _updateHeroCard(attacker);
-            // Attack animation flash
-            var atkEl = document.getElementById('field-unit-' + attacker.id);
-            if (atkEl) {
-              atkEl.classList.add('attacking');
-              setTimeout(function () { atkEl.classList.remove('attacking'); }, 300);
-              // Play LPC attack animation on canvas
-              _playLPCAnimation(atkEl, 'attack', attacker.isHero ? false : true);
-            }
-          }
-          // Play hurt animation on defender sprite
-          if (defender) {
-            var defEl = document.getElementById('field-unit-' + defender.id);
-            if (defEl) _playLPCAnimation(defEl, 'hurt', defender.isHero ? false : true);
-          }
+          if (attacker && attacker.isHero) _updateHeroCard(attacker);
         }
 
         if (entry.type === 'death') {
+          BattleRenderer.onDeath(entry.unitId);
           var deadUnit = _combatInstance.allUnits.find(function (u) { return u.id === entry.unitId; });
-          if (deadUnit) {
-            _updateFieldUnit(deadUnit);
-            if (deadUnit.isHero) _updateHeroCard(deadUnit);
-          }
+          if (deadUnit && deadUnit.isHero) _updateHeroCard(deadUnit);
           _updateLogBar(entry.message);
         }
 
         if (entry.type === 'dot') {
+          BattleRenderer.onDOT(entry.unitId, entry.damage);
           var dotUnit = _combatInstance.allUnits.find(function (u) { return u.id === entry.unitId; });
-          if (dotUnit) {
-            _updateFieldUnit(dotUnit);
-            if (dotUnit.isHero) _updateHeroCard(dotUnit);
-          }
+          if (dotUnit && dotUnit.isHero) _updateHeroCard(dotUnit);
         }
 
         if (entry.type === 'status') {
@@ -563,6 +279,7 @@
 
   function _endCombat(result) {
     if (_combatTimer) { clearInterval(_combatTimer); _combatTimer = null; }
+    BattleRenderer.stop();
 
     var rewards = CombatEngine.calculateRewards(_floorNum, result);
     var resultOverlay = document.getElementById('combat-result-overlay');
@@ -611,6 +328,7 @@
           '</div>' : '') +
         eventHTML +
         '<div class="combat-result-buttons">' +
+          (_isArenaMode && isVictory ? '<button class="scene-btn" id="combat-result-auto" style="border-color:#FFD700;color:#FFD700">[ ▶ AUTO REPEAT ]</button>' : '') +
           '<button class="scene-btn" id="combat-result-close">[ CONTINUE ]</button>' +
         '</div>' +
       '</div>';
@@ -630,7 +348,6 @@
         while (u._heroRef.exp >= expNeeded) {
           u._heroRef.exp -= expNeeded;
           u._heroRef.level++;
-          // Recalculate stats on level up
           var talentBonus = Math.floor(u._heroRef.talent * 0.15);
           u._heroRef.stats.strength     += 2 + talentBonus;
           u._heroRef.stats.intelligence += 2 + talentBonus;
@@ -653,6 +370,22 @@
       updateGemsDisplay();
       updateGoldDisplay();
       saveGame();
+    }
+
+    // Auto-repeat button (arena only)
+    var autoBtn = document.getElementById('combat-result-auto');
+    if (autoBtn) {
+      autoBtn.addEventListener('click', function () {
+        _closeCombatOverlay();
+        setTimeout(function () {
+          launchCombat(_floorNum, {
+            arenaMode: true,
+            onEnd: function (r) {
+              setTimeout(function () { showArenaScene(); }, 200);
+            },
+          });
+        }, 400);
+      });
     }
 
     // Close button
@@ -730,6 +463,7 @@
 
   function _handleRetreat() {
     if (_combatTimer) { clearInterval(_combatTimer); _combatTimer = null; }
+    BattleRenderer.stop();
     _closeCombatOverlay();
     if (_onCombatEnd) _onCombatEnd('retreat');
   }
@@ -815,6 +549,7 @@
     if (!isEmpty) {
       document.getElementById('arena-quick-battle').addEventListener('click', function () {
         launchCombat(gameState.tower.currentFloor, {
+          arenaMode: true,
           onEnd: function (result) {
             setTimeout(function () { showArenaScene(); }, 200);
           },
@@ -871,6 +606,7 @@
         var floor = parseInt(btn.dataset.floor, 10);
         overlay.remove();
         launchCombat(floor, {
+          arenaMode: true,
           onEnd: function () {
             setTimeout(function () { showArenaScene(); }, 200);
           },
@@ -880,7 +616,7 @@
   }
 
   function registerSceneArena() {
-    // All arena scene functions are declared globally above.
+    // All arena scene functions are declared above.
   }
 
   // ── Exports ─────────────────────────────────────────────

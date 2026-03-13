@@ -279,6 +279,28 @@
     const result = performSynthesis(_selectedBase, _selectedSacrifice);
     if (!result.ok) {
       console.warn('[Synthesis] Failed:', result.reason);
+      // Show error feedback to the user
+      var errOverlay = document.createElement('div');
+      errOverlay.id = 'synth-error-overlay';
+      errOverlay.style.cssText =
+        'position:fixed;inset:0;z-index:960;' +
+        'background:rgba(0,0,0,0.85);' +
+        'display:flex;align-items:center;justify-content:center;' +
+        'pointer-events:all;';
+      var errPanel = document.createElement('div');
+      errPanel.style.cssText =
+        'background:#12001A;border:1px solid #FF4444;' +
+        'padding:24px 28px;max-width:400px;width:90%;' +
+        "font-family:'Courier New',monospace;text-align:center;";
+      errPanel.innerHTML =
+        '<div style="color:#FF4444;font-size:15px;letter-spacing:2px;margin-bottom:14px">[ SYNTHESIS FAILED ]</div>' +
+        '<div style="color:#C0C0D0;font-size:12px;margin-bottom:18px">' + escHtml(result.reason) + '</div>' +
+        '<button id="synth-error-ok" style="background:#0D0010;border:2px solid #C0C0D0;color:#fff;' +
+        "font-family:'Courier New',monospace;font-size:13px;padding:6px 24px;cursor:pointer;letter-spacing:1px\">[ OK ]</button>";
+      errOverlay.appendChild(errPanel);
+      document.getElementById('ui-layer').appendChild(errOverlay);
+      document.getElementById('synth-error-ok').addEventListener('click', function () { errOverlay.remove(); });
+      errOverlay.addEventListener('click', function (e) { if (e.target === errOverlay) errOverlay.remove(); });
       return;
     }
     openResultOverlay(result.result);

@@ -142,16 +142,8 @@
       critDamage:    isBoss ? 160 : 130 + Math.floor(floorNum / 10) * 3,
       reactionTime:  isBoss ? 0.8 : Math.max(0.4, 1.0 - floorNum * 0.005),
       talent:        isBoss ? 5 + Math.floor(floorNum / 25) : 2 + Math.floor(floorNum / 30),
-      spriteId:      null,
-      lpcKey:        lpcKey,
+      spriteKey:     lpcKey || 'orc',
     };
-
-    // Fire async sprite generation (non-blocking)
-    if (lpcKey && typeof SpriteGen !== 'undefined') {
-      SpriteGen.generateEnemySprite(lpcKey).then(function (data) {
-        enemy.spriteId = data.spriteId;
-      }).catch(function () { /* no sprite server */ });
-    }
 
     return enemy;
   }

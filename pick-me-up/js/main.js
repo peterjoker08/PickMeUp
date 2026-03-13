@@ -41,22 +41,6 @@ registerSceneArena();
 
 // Entry point
 (function init() {
-  // Pre-warm common enemy sprites in the background (non-blocking)
-  if (typeof SpriteGen !== 'undefined') {
-    SpriteGen.prewarmEnemySprites();
-
-    // Generate sprites for any heroes missing them (e.g. from older saves)
-    gameState.inventory.forEach(function (item) {
-      if (item.type === 'hero' && !item.spriteId) {
-        SpriteGen.generateHeroSprite(item).then(function (data) {
-          item.spriteId = data.spriteId;
-          saveGame();
-          console.log('[Main] Generated missing sprite for', item.name, data.spriteId);
-        }).catch(function () { /* server not running */ });
-      }
-    });
-  }
-
   if (loadGame()) {
     document.getElementById('boot-ui').style.display = 'none';
     showHub();

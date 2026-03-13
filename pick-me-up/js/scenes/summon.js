@@ -393,20 +393,9 @@ function handlePull(count) {
 
   const results = performPull(activeBanner, count);
 
-  // Fire sprite generation in parallel (non-blocking)
-  var spritePromises = results.map(function (r) {
-    if (r.type !== 'hero' || typeof SpriteGen === 'undefined') return Promise.resolve();
-    return SpriteGen.generateHeroSprite(r).then(function (data) {
-      r.spriteId = data.spriteId;
-    }).catch(function () { /* server unavailable — no sprite */ });
-  });
-  var allSprites = Promise.all(spritePromises);
-
-  // Run animation; when BOTH animation + sprites are done, show results
+  // Run pull animation then show results
   runPullAnimation(results, function () {
-    allSprites.then(function () {
-      showResultsPanel(results);
-    });
+    showResultsPanel(results);
   });
 }
 

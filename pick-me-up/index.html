@@ -1,228 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-window.LDtkLoader = LDtkLoader;// Make globally available}  }    });      scene.load.start();            });        }          });            frameHeight: tileset.tileGridSize,            frameWidth: tileset.tileGridSize,          scene.load.spritesheet(tileset.identifier, path, {                    const rows = Math.floor(tileset.pxHei / tileset.tileGridSize);          const cols = Math.floor(tileset.pxWid / tileset.tileGridSize);          const path = basePath + tileset.relPath.split('/').pop();        if (tileset.relPath) {      data.defs.tilesets.forEach(tileset => {      if (!data) return;      const data = scene.cache.json.get(ldtkKey);    scene.load.once('complete', () => {    // We need to wait for JSON to load, so use scene events  static preloadTilesets(scene, ldtkKey, basePath = 'assets/tilesets/') {   */   * Call this in preload after loading the LDtk JSON   * Load tilesets defined in LDtk project  /**  }    }));      tags: entity.__tags || []      }, {}),        return acc;        acc[field.__identifier] = field.__value;      fields: entity.fieldInstances.reduce((acc, field) => {      pivot: entity.__pivot,      height: entity.height,      width: entity.width,      y: entity.px[1] + layer.__pxTotalOffsetY,      x: entity.px[0] + layer.__pxTotalOffsetX,      id: entity.__identifier,    return layer.entityInstances.map(entity => ({  static createEntities(layer) {   */   * Extract entities from entity layer  /**  }    return colliders;    });      }        colliders.push(rect);                rect.body.setSize(gridSize, gridSize);        scene.physics.add.existing(rect, true); // static body        rect.setVisible(false);        );          gridSize          gridSize,           y + gridSize/2,           x + gridSize/2,         const rect = scene.add.rectangle(                const y = Math.floor(index / width) * gridSize + layer.__pxTotalOffsetY;        const x = (index % width) * gridSize + layer.__pxTotalOffsetX;      if (value > 0) { // Non-zero = solid    layer.intGridCsv.forEach((value, index) => {    // Create collision rectangles for solid tiles        const height = layer.__cHei;    const width = layer.__cWid;    const gridSize = layer.__gridSize;    const colliders = [];  static createIntGridColliders(scene, layer) {   */   * Create colliders from IntGrid layer  /**  }    return { container, group, tiles };    });      }        group.add(sprite);        container.add(sprite);                if (tile.f & 2) sprite.setFlipY(true);        if (tile.f & 1) sprite.setFlipX(true);        // Handle flipping                sprite.setDisplaySize(gridSize, gridSize);        const sprite = scene.add.sprite(dstX + gridSize/2, dstY + gridSize/2, tilesetKey, frameIndex);      if (scene.textures.exists(tilesetKey)) {      // Create sprite            const frameIndex = tileRow * cols + tileCol;      const tileRow = Math.floor(srcY / gridSize);      const tileCol = Math.floor(srcX / gridSize);      const cols = Math.floor(tilesetDef.pxWid / gridSize);      // Calculate frame index            const dstY = tile.px[1] + layer.__pxTotalOffsetY;      const dstX = tile.px[0] + layer.__pxTotalOffsetX;      // Get destination position            const srcY = tile.src[1];      const srcX = tile.src[0];      // Get source position in tileset    tiles.forEach(tile => {    container.setDepth(depth);    const container = scene.add.container(0, 0);    // Create container for this layer        const group = scene.add.group();    const tilesetKey = tilesetImages[tilesetDef.identifier] || tilesetDef.identifier;    }      return null;      console.warn(`[LDtk] No tileset for layer: ${layer.__identifier}`);    if (!tilesetDef) {        const tilesetDef = tilesetDefs.find(t => t.uid === layer.__tilesetDefUid);    const gridSize = layer.__gridSize;    const tiles = layer.gridTiles || layer.autoLayerTiles || [];  static createTileLayer(scene, layer, tilesetDefs, tilesetImages, depth) {   */   * Create a tile layer from LDtk layer data  /**  }    return result;    });      }          break;          result.entities.push(...this.createEntities(layer));        case 'Entities':                    break;          result.colliders.push(...this.createIntGridColliders(scene, layer));          // Also create colliders for IntGrid values          }            );              scene, layer, data.defs.tilesets, tilesetImages, depth            result.layers[layerName] = this.createTileLayer(          if (layer.autoLayerTiles && layer.autoLayerTiles.length > 0) {          // IntGrid can have auto-tiles or just collision data        case 'IntGrid':                    break;          );            scene, layer, data.defs.tilesets, tilesetImages, depth          result.layers[layerName] = this.createTileLayer(        case 'AutoLayer':        case 'Tiles':      switch (layer.__type) {            const layerName = layer.__identifier;    layerInstances.forEach((layer, depth) => {    const layerInstances = [...(level.layerInstances || [])].reverse();    // Process layer instances (they're in reverse order in LDtk)    };      tileSize: data.defaultGridSize || 16      },        height: level.pxHei        width: level.pxWid,        y: level.worldY || 0,        x: level.worldX || 0,      bounds: {      colliders: [],      entities: [],      layers: {},    const result = {    console.log(`[LDtk] Creating level: ${level.identifier} (${level.pxWid}x${level.pxHei})`);    }      return null;      console.error(`[LDtk] Level not found: ${levelId}`);    if (!level) {          : data.levels.find(l => l.identifier === levelId);      ? data.levels[levelId]     const level = typeof levelId === 'number'     // Get the level    }      return null;      console.error(`[LDtk] No data found for key: ${ldtkKey}`);    if (!data) {    const data = scene.cache.json.get(ldtkKey);  static createLevel(scene, ldtkKey, levelId = 0, tilesetImages = {}) {   */   * @returns {Object} { layers, entities, colliders, bounds }   * @param {Object} tilesetImages - Map of tileset names to loaded image keys   * @param {string} levelId - Level identifier or index (default: first level)   * @param {string} ldtkKey - Cache key of loaded LDtk JSON   * @param {Phaser.Scene} scene - The Phaser scene   * Create tilemap from loaded LDtk data  /**  }    scene.load.json(key, url);  static preload(scene, key, url) {   */   * @param {string} url - URL to the .ldtk file   * @param {string} key - Cache key for the LDtk data   * @param {Phaser.Scene} scene - The Phaser scene   * Load an LDtk project file  /**class LDtkLoader {// ═══════════════════════════════════════════════════════════// Loads and renders LDtk tilemap files<head>
+<head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pick Me Up · Infinite Gacha Online</title>
@@ -361,19 +139,6 @@ window.LDtkLoader = LDtkLoader;// Make globally available}  }    });      scene.
 
 </div>
 
-<!-- Dependencies -->
-<script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-<script src="https://unpkg.com/kaplay@3000/dist/kaplay.js"></script>
-
-<!-- LDtk tilemap loader for Phaser -->
-<script src="js/phaser/LDtkLoader.js"></script>
-
-<!-- Phaser scenes (must load before PhaserGame.js) -->
-<script src="js/phaser/scenes/Lobby.js"></script>
-<script src="js/phaser/scenes/Tower.js"></script>
-<script src="js/phaser/scenes/Cutscene.js"></script>
-<script src="js/phaser/PhaserGame.js"></script>
-
 <!-- Game scripts — order matters -->
 <script src="js/gameState.js"></script>
 <script src="js/ui/helpers.js"></script>
@@ -383,7 +148,7 @@ window.LDtkLoader = LDtkLoader;// Make globally available}  }    });      scene.
 <script src="js/scenes/hub.js"></script>
 <script src="js/scenes/heroes.js"></script>
 <script src="js/scenes/summon.js"></script>
-<script src="js/systems/spriteGen.js"></script>
+<script src="js/systems/spriteAnimator.js"></script>
 <script src="js/systems/enemies.js"></script>
 <script src="js/systems/statusEffects.js"></script>
 <script src="js/systems/combat.js"></script>
@@ -397,6 +162,7 @@ window.LDtkLoader = LDtkLoader;// Make globally available}  }    });      scene.
 <script src="js/scenes/shop.js"></script>
 <script src="js/scenes/manor.js"></script>
 <script src="js/scenes/inventory.js"></script>
+<script src="js/scenes/battle.js"></script>
 <script src="js/scenes/arena.js"></script>
 <script src="js/main.js"></script>
 </body>

@@ -91,9 +91,6 @@ function resetHubMain() {
  * Called by Phaser scenes (Lobby, Tower, etc.) when user presses ESC or exits.
  */
 function exitToHub() {
-  if (typeof PhaserGame !== 'undefined') {
-    PhaserGame.hide();
-  }
   showHub();
 }
 
@@ -109,10 +106,6 @@ function hubNav(name) {
   // Launch Phaser Lobby for the walkable town hub
   if (name === 'Lobby') {
     resetHubMain();
-    // Show Phaser walkable lobby instead of static HTML
-    if (typeof PhaserGame !== 'undefined') {
-      PhaserGame.show('Lobby');
-    }
     return;
   }
 
