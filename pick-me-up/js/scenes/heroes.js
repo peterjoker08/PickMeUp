@@ -6,8 +6,6 @@ let heroesActiveTab   = 'roster';
 let heroSortMode      = 'recent';
 let pickerSortMode    = 'rarity';
 let currentPickerSlot = -1;
-let _toastTimer       = null;
-
 // Weapon picker (EQUIP button in hero detail)
 let _wpHeroId     = null;
 let _wpSlot       = null;

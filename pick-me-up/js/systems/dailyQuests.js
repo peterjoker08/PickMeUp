@@ -2,12 +2,12 @@
 // DAILY QUESTS SYSTEM
 // ═══════════════════════════════════════════════════════════
 // Reads QUEST_KEYS from gameState.js (defined before this loads).
-// Loaded after mailbox.js so sendMail() is available.
+// Loaded after helpers.js so applyReward() is available.
 //
 // Quest flow:
 //   Scene hooks → progressDailyQuest(key) → progress[key]=1 → badge
-//   Quest panel → [ CLAIM ] → claimQuestReward(key) → sendMail → claimed[key]=true
-//   All 6 done → [ CLAIM BONUS ] → claimAllCompleteBonus() → sendMail
+//   Quest panel → [ CLAIM ] → claimQuestReward(key) → applyReward → claimed[key]=true
+//   All 6 done → [ CLAIM BONUS ] → claimAllCompleteBonus() → applyReward
 //
 // Daily reset (3rd use of ISO-date pattern after checkShopReset, checkDungeonResets):
 //   new Date().toISOString().slice(0,10) compared to lastReset
@@ -16,16 +16,17 @@
 
   // ── Quest definitions ─────────────────────────────────────
   // Keys must match window.QUEST_KEYS in gameState.js exactly.
+  // reward fields map 1-to-1 to applyReward() — any currency key is valid.
   var QUEST_DEFS = {
-    towerChallenge: { label: 'Complete Tower Challenge',   reward: { gems: 30 } },
+    towerChallenge: { label: 'Complete Tower Challenge',   reward: { gems: 30, schematics: 5 } },
     summon:         { label: 'Summon from Any Banner',     reward: { gems: 30 } },
     towerRewards:   { label: 'Claim Tower Daily Reward',   reward: { gold: 500 } },
-    expedition:     { label: 'Dispatch an Expedition',     reward: { gold: 300 } },
+    expedition:     { label: 'Dispatch an Expedition',     reward: { gold: 300, schematics: 5 } },
     shopPurchase:   { label: 'Purchase from Shop',         reward: { gems: 20 } },
     talkToHero:     { label: 'Talk to a Hero',             reward: { gems: 20 } },
   };
 
-  var ALL_COMPLETE_BONUS = { gems: 150, gold: 500 };
+  var ALL_COMPLETE_BONUS = { gems: 150, gold: 500, schematics: 20 };
 
   // ── Daily reset ───────────────────────────────────────────
   // Follows checkShopReset() pattern exactly (3rd instance).
@@ -59,7 +60,7 @@
 
   // ── Claim an individual quest reward ─────────────────────
   // Double-claim guard: checks both progress and claimed flags.
-  // Delivers reward via sendMail (never auto-applied inline).
+  // Delivers reward inline via applyReward() (instant, no mailbox visit).
   function claimQuestReward(key) {
     if (!gameState.dailyQuests) return;
     if (gameState.dailyQuests.progress[key] !== 1) return;  // not yet done
@@ -69,13 +70,8 @@
     saveGame();
 
     var def = QUEST_DEFS[key];
-    if (def && typeof sendMail === 'function') {
-      sendMail({
-        from:    'Quest Board',
-        subject: 'Quest Reward: ' + def.label,
-        body:    'You completed the daily quest "' + def.label + '".',
-        rewards: def.reward,
-      });
+    if (def) {
+      applyReward(def.reward);
     }
 
     updateQuestBadge();
@@ -95,16 +91,23 @@
     gameState.dailyQuests.allCompleteClaimed = true;
     saveGame();
 
-    if (typeof sendMail === 'function') {
-      sendMail({
-        from:    'Quest Board',
-        subject: 'Daily Quest Bonus!',
-        body:    'You completed all ' + QUEST_KEYS.length + ' daily quests! Here\'s your bonus.',
-        rewards: ALL_COMPLETE_BONUS,
-      });
-    }
+    applyReward(ALL_COMPLETE_BONUS);
 
     _renderQuestPanel();
+  }
+
+  // ── Reward display string ─────────────────────────────────
+  // Builds a human-readable reward summary from any applyReward()-compatible
+  // object. Supports all currency fields; skips zero/falsy values.
+  // Returns '—' when reward is empty.
+  function _rewardStr(reward) {
+    var parts = [];
+    if (reward.gems)       parts.push('💎 ' + reward.gems       + ' Gems');
+    if (reward.gold)       parts.push('🪙 ' + reward.gold       + ' Gold');
+    if (reward.schematics) parts.push('🔩 ' + reward.schematics + ' BD');
+    if (reward.wishes)     parts.push('🌟 ' + reward.wishes     + ' Wish');
+    if (reward.bread)      parts.push('🍞 ' + reward.bread      + ' Bread');
+    return parts.length > 0 ? parts.join(' · ') : '—';
   }
 
   // ── Quest badge ───────────────────────────────────────────
@@ -143,9 +146,7 @@
       var def       = QUEST_DEFS[key];
       var done      = dq.progress[key] === 1;
       var claimed   = dq.claimed[key];
-      var rewardStr = def.reward.gems ? '💎 ' + def.reward.gems + ' Gems'
-                    : def.reward.gold ? '🪙 ' + def.reward.gold + ' Gold'
-                    : '—';
+      var rewardStr = _rewardStr(def.reward);
       var statusCol  = done ? '#4CAF50' : '#888899';
       var statusText = done ? '[ ✓ DONE ]' : '[  ○  ]';
 
@@ -182,7 +183,7 @@
       bonusHTML = `
         <div style="margin-top:20px;padding:16px;border:2px solid #F1C40F;background:rgba(241,196,15,0.06)">
           <div style="color:#F1C40F;font-size:13px;letter-spacing:2px;margin-bottom:8px">[ ALL QUESTS COMPLETE! ]</div>
-          <div style="color:#E8D5FF;font-size:11px;margin-bottom:12px">Bonus Reward: 💎 ${ALL_COMPLETE_BONUS.gems} Gems · 🪙 ${ALL_COMPLETE_BONUS.gold} Gold</div>
+          <div style="color:#E8D5FF;font-size:11px;margin-bottom:12px">Bonus Reward: ${_rewardStr(ALL_COMPLETE_BONUS)}</div>
           <button id="quest-all-claim-btn"
             style="background:#1A0025;border:2px solid #F1C40F;color:#FFFFFF;
                    font-family:'Courier New',monospace;font-size:13px;padding:9px 22px;
@@ -199,7 +200,7 @@
       bonusHTML = `
         <div style="margin-top:20px;padding:14px 16px;border:1px solid #2A003A">
           <div style="color:#888899;font-size:12px;letter-spacing:1px;display:flex;justify-content:space-between">
-            <span>Complete all ${QUEST_KEYS.length} for bonus: 💎 ${ALL_COMPLETE_BONUS.gems} Gems · 🪙 ${ALL_COMPLETE_BONUS.gold} Gold</span>
+            <span>Complete all ${QUEST_KEYS.length} for bonus: ${_rewardStr(ALL_COMPLETE_BONUS)}</span>
             <span style="color:#E8D5FF">${doneCount} / ${QUEST_KEYS.length}</span>
           </div>
         </div>`;
