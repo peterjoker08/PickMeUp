@@ -35,9 +35,10 @@ registerSceneTutorial();
 registerSceneSynthesis();
 registerScenePromotion();
 registerSceneShop();
-registerSceneManor();
+registerSceneCity();
 registerSceneInventory();
 registerSceneArena();
+registerSceneLoginRewards();
 
 // Entry point
 (function init() {
