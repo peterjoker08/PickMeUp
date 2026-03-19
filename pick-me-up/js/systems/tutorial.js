@@ -1482,12 +1482,14 @@
     });
     if (hint) {
       scene.innerHTML =
-        '<div style="background:#12001A;border:1px solid #C0C0D0;padding:20px 28px;' +
-          'max-width:420px;font-family:\'Courier New\',monospace;">' +
+        '<div id="tut-hint-panel" style="background:#12001A;border:1px solid #C0C0D0;padding:20px 28px;' +
+          'max-width:420px;font-family:\'Courier New\',monospace;cursor:pointer;">' +
           '<div style="color:#E8D5FF;font-size:12px;line-height:1.8;letter-spacing:1px">' + escHtml(hint) + '</div>' +
-          '<div style="color:#888899;font-size:11px;margin-top:16px;text-align:center;animation:blink 1s step-end infinite;cursor:pointer">[ Tap to close ]</div>' +
+          '<div style="color:#888899;font-size:11px;margin-top:16px;text-align:center;animation:blink 1s step-end infinite;">[ Tap to close ]</div>' +
         '</div>';
-      await waitTap();
+      await new Promise(function (resolve) {
+        document.getElementById('tut-hint-panel').addEventListener('click', resolve, { once: true });
+      });
     }
     scene.style.display = 'none';
   }
@@ -1572,16 +1574,18 @@
       });
     });
     scene.innerHTML =
-      '<div style="font-family:\'Courier New\',monospace;text-align:center;padding:32px 40px;min-width:280px;">' +
+      '<div id="tut-bakery-close" style="font-family:\'Courier New\',monospace;text-align:center;padding:32px 40px;min-width:280px;cursor:pointer;">' +
         '<div style="color:#4CAF50;font-size:13px;letter-spacing:2px;margin-bottom:16px">[ REPAIR REWARDS ]</div>' +
         '<div style="color:#E8D5FF;font-size:12px;line-height:2.2;text-align:left;display:inline-block">' +
           '1. \uD83C\uDF1F One Wish \u2014 Recruit heroes at the Summoning Station.<br>' +
           '2. \uD83C\uDF5E Bread Production \u2014 1 unit per 8 minutes.<br>' +
           '3. \uD83D\uDD29 40 Building Schematics.' +
         '</div>' +
-        '<div style="color:#888899;font-size:11px;margin-top:20px;animation:blink 1s step-end infinite;cursor:pointer">[ Tap to close ]</div>' +
+        '<div style="color:#888899;font-size:11px;margin-top:20px;animation:blink 1s step-end infinite;">[ Tap to close ]</div>' +
       '</div>';
-    await waitTap();
+    await new Promise(function (resolve) {
+      document.getElementById('tut-bakery-close').addEventListener('click', resolve, { once: true });
+    });
     scene.style.display = 'none';
   }
 

@@ -115,6 +115,16 @@ function _lobbyBuildingsHTML() {
         spireLevelLine +
       '</div>' +
 
+      // ── LOGIN REWARDS ────────────────────────────────────────────────────
+      '<div id="lobby-login-rewards"' +
+        ' onclick="if(typeof showLoginRewardsScene===\'function\'){showLoginRewardsScene();}"' +
+        ' style="cursor:pointer;background:#12001A;border:2px solid #EAB308;' +
+               'padding:16px 32px;text-align:center;font-family:\'Courier New\',monospace;' +
+               'min-width:180px;user-select:none;">' +
+        '<div style="font-size:22px;margin-bottom:8px">\uD83C\uDF81</div>' +
+        '<div style="color:#FFFFFF;font-size:13px;letter-spacing:2px">Login Rewards</div>' +
+      '</div>' +
+
       // ── BAKERY ───────────────────────────────────────────────────────────
       // Hidden until gameState.city.buildings.bakery.unlocked === true
       // TODO: replace with actual Bakery asset when available

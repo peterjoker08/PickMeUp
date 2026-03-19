@@ -232,6 +232,13 @@
   function closeLoginRewardsScene() {
     const overlay = document.getElementById('login-rewards-overlay');
     if (overlay) overlay.style.display = 'none';
+
+    // Return to Lobby when closing from the back button flow.
+    if (typeof hubNav === 'function') {
+      hubNav('Lobby');
+    } else if (typeof showHub === 'function') {
+      showHub();
+    }
   }
 
   function registerSceneLoginRewards() {
