@@ -55,6 +55,17 @@ window.gameState = {
   mailbox: [],
   items:   [],
   firstPullDone: false,  synergy: { level: 0 },
+  schematics:    0,      // Building Schematics (BD) — 3rd currency
+  wishes:        0,      // summon tickets (1 = 1 pull)
+  bread:         0,      // dungeon stamina (max 200; produced by Bakery)
+  lastBreadTime: null,   // ms timestamp of last bread accumulation origin; null = Bakery not built
+  city: {
+    name: null,          // set during intro ("Name your city")
+    buildings: {
+      mysticSpire: { level: 0, unlocked: true },   // starter building; levels 0–5 cost BD
+      bakery:      { unlocked: false },             // unlocked after Spire L3 (or intro quest)
+    },
+  },
   afkRewards: {
     lastCollectTime: null,   // timestamp of last AFK reward collection / login
   },
@@ -64,6 +75,7 @@ window.gameState = {
     claimed:            {},     // { [questKey]: bool } — populated by migrateInventory
     allCompleteClaimed: false,  // all-6 bonus claimed today
   },
+  loginDays: 0,  // total lifetime login days (incremented once per calendar day)
 };
 
 // ─── SAVE / LOAD ───────────────────────────────────────────
@@ -89,6 +101,12 @@ function saveGame() {
     synergy:          gameState.synergy,
     afkRewards:       gameState.afkRewards,
     dailyQuests:      gameState.dailyQuests,
+    schematics:       gameState.schematics,
+    wishes:           gameState.wishes,
+    bread:            gameState.bread,
+    lastBreadTime:    gameState.lastBreadTime,
+    city:             gameState.city,
+    loginDays:        gameState.loginDays,
   }));
 }
 
@@ -156,6 +174,12 @@ function loadGame() {
           });
         }
       }
+      gameState.schematics    = typeof d.schematics === 'number' ? d.schematics : 0;
+      gameState.wishes        = typeof d.wishes     === 'number' ? d.wishes     : 0;
+      gameState.bread         = typeof d.bread      === 'number' ? d.bread      : 0;
+      gameState.lastBreadTime = typeof d.lastBreadTime === 'number' ? d.lastBreadTime : null;
+      if (d.city) gameState.city = d.city;
+      gameState.loginDays = typeof d.loginDays === 'number' ? d.loginDays : 0;
       migrateInventory();
       checkDungeonResets();
       checkShopReset();
@@ -302,6 +326,42 @@ function updateActivePenalty(hero) {
 // ═══════════════════════════════════════════════════════════
 // MIGRATE INVENTORY
 // ═══════════════════════════════════════════════════════════
+//
+// Additive only — never removes or renames existing fields.
+// Called at end of loadGame() and at scene entry as a safety net.
+//
+// ── City + currency state shape ──────────────────────────
+//
+//   gameState.schematics    : int ≥ 0   Building Schematics (BD currency)
+//   gameState.wishes        : int ≥ 0   summon tickets (1 wish = 1 pull)
+//   gameState.bread         : 0–200     dungeon stamina produced by Bakery
+//   gameState.lastBreadTime : ms | null null until Bakery is first unlocked
+//
+//   gameState.city = {
+//     name      : string | null,     ← named by player at intro step 7
+//     buildings : {
+//       mysticSpire : {
+//         level    : 0–5,            ← 0 = built (starter); L1-L5 cost BD
+//         unlocked : true,           ← always true (starter building)
+//       },
+//       bakery : {
+//         unlocked : bool,           ← true after Spire L3 (or intro quest)
+//         [no level — cannot be upgraded]
+//       },
+//     },
+//   }
+//
+//   Bread accumulation — fixed-origin model (NOT setInterval):
+//
+//     UNLOCK:   lastBreadTime = Date.now()       ← stamp once on bakery unlock
+//     ON OPEN:  elapsed  = now − lastBreadTime
+//               loaves   = floor(elapsed / 480_000)  ← 1 loaf per 8 min
+//               bread    = min(bread + loaves, 200)
+//               lastBreadTime += loaves × 480_000    ← advance origin, never reset to now
+//
+//   This ensures active players accumulate bread at the same rate as idle
+//   players — re-stamping to Date.now() would zero out accumulation.
+//
 function migrateInventory() {
   let changed = false;
 
@@ -365,6 +425,46 @@ function migrateInventory() {
   });
   if (typeof gameState.dailyQuests.allCompleteClaimed !== 'boolean') {
     gameState.dailyQuests.allCompleteClaimed = false; changed = true;
+  }
+
+  // ── Currency + bread timer migrations ────────────────────
+  // (additive — existing saves unaffected; ?? catches null and undefined)
+  if (gameState.schematics    == null) { gameState.schematics    = 0;    changed = true; }
+  if (gameState.wishes        == null) { gameState.wishes        = 0;    changed = true; }
+  if (gameState.bread         == null) { gameState.bread         = 0;    changed = true; }
+  if (typeof gameState.lastBreadTime === 'undefined') { gameState.lastBreadTime = null; changed = true; }
+
+  // ── City migration ────────────────────────────────────────
+  if (!gameState.city) {
+    gameState.city = {
+      name: null,
+      buildings: {
+        mysticSpire: { level: 0, unlocked: true },
+        bakery:      { unlocked: false },
+      },
+    };
+    changed = true;
+  }
+  if (!gameState.city.buildings) {
+    gameState.city.buildings = { mysticSpire: { level: 0, unlocked: true }, bakery: { unlocked: false } };
+    changed = true;
+  }
+  if (!gameState.city.buildings.mysticSpire) {
+    gameState.city.buildings.mysticSpire = { level: 0, unlocked: true };
+    changed = true;
+  }
+  if (!gameState.city.buildings.bakery) {
+    gameState.city.buildings.bakery = { unlocked: false };
+    changed = true;
+  }
+
+  // ── Tutorial migration guard ──────────────────────────────
+  // migration: old tutorial state incompatible with new step chain.
+  // Any positive tutorialStep means the player was mid-old-intro;
+  // reset to -1 (complete) so they skip the new intro entirely.
+  if (gameState.tutorialStep > 0) {
+    gameState.tutorialStep = -1;
+    changed = true;
   }
 
   // Auto-complete any finished active runs
@@ -649,6 +749,10 @@ function recordFloorClear(floorNum) {
   }
   gameState.currentFloor = gameState.tower.currentFloor;
   saveGame();
+  // Tower floor 1 clear → graduate player out of newbie state.
+  // clearNewbieTag() is exported by tutorial.js (loads after gameState.js).
+  // Guard: safe to call even if tutorial.js is absent (test/stub builds).
+  if (floorNum === 1 && typeof clearNewbieTag === 'function') clearNewbieTag();
 }
 
 function getExpToNext(level) {
@@ -926,3 +1030,8 @@ function checkShopReset() {
 
 window.purchaseItem  = purchaseItem;
 window.checkShopReset = checkShopReset;
+
+function triggerLoginRewards() {
+  if (typeof showLoginRewardsScene === 'function') showLoginRewardsScene();
+}
+window.triggerLoginRewards = triggerLoginRewards;

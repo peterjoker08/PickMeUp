@@ -3,6 +3,28 @@
 All notable changes to PickMeUp 3.0 are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.1.2.0] - 2026-03-14
+
+### Added
+- **Login Rewards scene** (`js/scenes/loginRewards.js`): full-screen 16:9 overlay matching Figma design — 28-day calendar grid, progress milestone track (days 5/10/15/20), amber/purple/dark-amber card states (claimed/unlocked/locked), bottom nav tabs stub.
+- `gameState.loginDays`: new field tracking total lifetime login days, persisted to localStorage.
+- `triggerLoginRewards()`: global function to open the Login Rewards overlay from anywhere.
+- **City scene** (`js/scenes/city.js`): replaces manor.js — Mystic Spire (levels 0–5, costs Building Schematics) and Bakery (unlocks at Spire L3, produces bread at 1 loaf/8 min up to cap 200).
+- **New currencies**: Building Schematics (BD), Wishes (pull tickets), Bread (dungeon stamina) — all persisted and migrated from old saves.
+- **Tutorial system** (`js/systems/tutorial.js`): full guide-mode walkthrough with highlight, dialogue, and choice steps; `clearNewbieTag()` unlocks on first tower floor clear.
+- **Lobby buildings** rendered in hub main area: Mystic Spire (animated pulse glow) and Bakery tile; both navigate to City scene.
+- `applyReward()` helper in `js/ui/helpers.js`: unified reward application across daily quests, tower rewards, affinity milestones.
+- Daily quest rewards now applied inline via `applyReward()` instead of via mailbox — instant gratification without a mailbox visit.
+- Daily quest `towerChallenge` and `expedition` rewards now also grant Schematics (+5 each); all-complete bonus now grants +20 Schematics.
+
+### Changed
+- `index.html`: manor.js replaced by city.js; loginRewards.js added before main.js.
+- `js/main.js`: `registerSceneManor()` → `registerSceneCity()`; `registerSceneLoginRewards()` added.
+- Restart button in hub now also clears `pickmeup_tut_bd_granted` localStorage key.
+
+### Removed
+- `js/scenes/manor.js`: replaced entirely by city.js.
+
 ## [0.1.1.0] - 2026-03-13
 
 ### Added

@@ -68,7 +68,7 @@
         <button class="hub-nav-btn" data-nav="Summon" onclick="hubNav('Summon')"><img src="assets/mainArt/Summon.webp"><span>Summon</span></button>
         <button class="hub-nav-btn" data-nav="Inventory" onclick="hubNav('Inventory')"><img src="assets/mainArt/Inventory.webp"><span>Inventory</span></button>
         <button class="hub-nav-btn" data-nav="Tutorial" onclick="hubNav('Tutorial')" style="border:1px dashed rgba(255,215,0,0.4);opacity:0.75"><img src="assets/mainArt/Quest.webp"><span>Tutorial</span></button>
-        <button class="hub-nav-btn" onclick="if(confirm('Reset ALL progress?')){localStorage.removeItem('pickmeup_save');location.reload()}" style="border:1px dashed rgba(255,100,100,0.4);opacity:0.75"><img src="assets/mainArt/Quest.webp"><span>Restart</span></button>
+        <button class="hub-nav-btn" onclick="if(confirm('Reset ALL progress?')){localStorage.removeItem('pickmeup_save');localStorage.removeItem('pickmeup_tut_bd_granted');location.reload()}" style="border:1px dashed rgba(255,100,100,0.4);opacity:0.75"><img src="assets/mainArt/Quest.webp"><span>Restart</span></button>
       </div>
       <div class="hub-nav-group" id="hub-nav-right">
         <button class="hub-nav-btn" data-nav="Dungeon" onclick="hubNav('Dungeon')"><img src="assets/mainArt/Dungeon.webp"><span>Dungeon</span></button>
@@ -125,6 +125,9 @@
   <!-- DEBUG TOAST -->
   <div id="debug-toast"></div>
 
+  <!-- LOGIN REWARDS OVERLAY -->
+  <div id="login-rewards-overlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);z-index:2000;display:none;align-items:center;justify-content:center;"></div>
+
   <!-- RESULTS OVERLAY -->
   <div id="results-overlay">
     <div id="results-panel">
@@ -155,16 +158,17 @@
 <script src="js/systems/mailbox.js"></script>
 <script src="js/systems/afkRewards.js"></script>
 <script src="js/systems/dailyQuests.js"></script>
+<script src="js/scenes/city.js"></script>
 <script src="js/systems/tutorial.js"></script>
 <script src="js/scenes/tower.js"></script>
 <script src="js/scenes/dungeons.js"></script>
 <script src="js/scenes/synthesis.js"></script>
 <script src="js/scenes/promotion.js"></script>
 <script src="js/scenes/shop.js"></script>
-<script src="js/scenes/manor.js"></script>
 <script src="js/scenes/inventory.js"></script>
 <script src="js/scenes/battle.js"></script>
 <script src="js/scenes/arena.js"></script>
+<script src="js/scenes/loginRewards.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

@@ -229,10 +229,11 @@
   function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   function waitTap() {
+    // Listen on document (not just #tut-overlay) so taps on modal content
+    // inside #tut-combat-scene resolve correctly even if bubbling is cut short.
+    // { once: true } auto-removes the listener after the first tap.
     return new Promise(resolve => {
-      const overlay = getEl('tut-overlay');
-      function handler() { overlay.removeEventListener('click', handler); resolve(); }
-      overlay.addEventListener('click', handler);
+      document.addEventListener('click', resolve, { once: true });
     });
   }
 
@@ -719,17 +720,10 @@
     await showDialogue('SYSTEM', "Stage cleared!", { autoMs: 1500 });
     await showDialogue('SYSTEM', "'Han(★)' leveled up!", { autoMs: 1500 });
 
-    // Send tutorial reward mail
-    if (typeof sendMail === 'function') {
-      sendMail({
-        from: 'Iselle',
-        subject: 'Tutorial Battle Reward',
-        body: 'Congratulations on completing your first battle, Master! Here is a small gift to help you on your journey.',
-        rewards: { gems: 50, gold: 200, items: [{ id: 'fear_prevention_potion', name: 'Fear Prevention Potion', count: 1 }] },
-      });
-    }
+    // Apply tutorial battle reward (60 gems, 100 gold per intro script)
+    applyReward({ gems: 60, gold: 100 });
 
-    await showDialogue('SYSTEM', "A reward has been sent to your mailbox.", { autoMs: 2000 });
+    await showDialogue('Iselle', "You did it! Rough around the edges, but that\u2019s what we\u2019re here to fix. Here\u2019s a small gift \u2014 you\u2019ve earned it.", { autoMs: 2500 });
 
     scene.style.display = 'none';
   }
@@ -1051,101 +1045,140 @@
     await showDialogue('SYSTEM', "Stage cleared!", { autoMs: 1500 });
     await showDialogue('SYSTEM', "'Shay (\u2605\u2605\u2605\u2605)' leveled up!", { autoMs: 1500 });
 
-    if (typeof sendMail === 'function') {
-      sendMail({
-        from: 'Iselle',
-        subject: 'Tutorial Quest 2 Reward',
-        body: 'Well done, Master! Your party fought bravely against the goblin horde. Here are your rewards.',
-        rewards: { gems: 80, gold: 500, items: [] },
-      });
-    }
+    applyReward({ gems: 80, gold: 500 });
 
-    await showDialogue('SYSTEM', "Rewards have been granted. Please check your mailbox.", { autoMs: 2000 });
+    await showDialogue('SYSTEM', "Victory! Your party fought bravely against the goblin horde.", { autoMs: 2000 });
     await showDialogue('SYSTEM', "MVP \u2013 'Shay (\u2605\u2605\u2605\u2605)'", { autoMs: 2000 });
 
     scene.style.display = 'none';
   }
 
   /* ── TUTORIAL STEP SCRIPT ─────────────────────── */
-  const STEPS = [
-    // -- PROLOGUE NARRATION (BLACK SCREEN CUTSCENE PLACEHOLDER) --
-    { type: 'blackScreen', text: '[ Animated Cutscene — Coming Soon ]' },
-    { type: 'narration', speaker: 'SYSTEM', text: 'In a small village in the Heim region, there was a boy named \'Han Israt.\'' },
-    { type: 'narration', speaker: 'SYSTEM', text: 'The land of harmony between humans and nonhumans \u2014 Townia.' },
-    { type: 'narration', speaker: 'SYSTEM', text: 'An unknown enemy has invaded the continent of peace.' },
-    { type: 'narration', speaker: 'Iselle', text: 'You, Master! If you wish to save the world... Climb the tower!' },
-    { type: 'narration', speaker: 'Iselle', text: 'A myriad of heroes will be there with you.' },
+  //
+  //  Beat map (15 narrative beats):
+  //
+  //   0  Wake-up          Iselle intro + camera shake + Han cutscene
+  //   1  Repair Spire     guide → City tab
+  //   2  Help Han         [View] tap prompt
+  //   3  Heal Han         Potion + Bread action prompts → 10 BD reward
+  //   4  Han thanks       dialogue chain
+  //   5  First combat     runCombatCutscene (60 gems, 100 gold)
+  //   6  Return to city   guide → Lobby tab
+  //   7  City lore        Iselle sad/hopeful + spire guidance dialogue
+  //   8  Spire built      guide → City + _showSpireBuilt (200 gold + Bakery)
+  //   9  City name        _showCityNamePrompt + Iselle city-name dialogue
+  //  10  Bakery unlock    _showBakeryUnlock (200 gold cost → 1 Wish + 40 BD)
+  //  11  Summon/Tower     guide → Summon → tutorialSummon → Heroes → Shay → Tower
+  //  12  Epilogue         Post-tower Iselle + Han dialogue
+  //  (end)
+  //
+  var STEPS = [
 
-    // -- TUTORIAL QUEST 1: COMBAT --
-    { type: 'narration', speaker: 'SYSTEM', text: 'Tutorial Quest 1: Defeat the skeleton invading the village!' },
-    { type: 'narration', speaker: 'Iselle', text: 'The battle will proceed automatically. Enjoy high-level combat implemented by the hero\'s internal AI!' },
-    { type: 'combat' },
+    // ── 0: WAKE-UP ───────────────────────────────────────────────
+    { type: 'narration',        speaker: 'Iselle', text: "You\u2019re awake at last. I\u2019m Iselle, your companion." },
+    { type: 'narration',        speaker: 'Iselle', text: "Things are bad\u2026 Monsters have broken through the defenses and are invading Townia. We need to hurry! Oh, no!" },
+    { type: 'cameraShake' },
+    { type: 'cutscene',         text: '[ The volcano erupts \u2014 goblin hordes storm from the hillside! ]' },
+    { type: 'cutscene',         text: '[ Han runs through the burning streets and hides in a corner, trembling\u2026 ]' },
 
-    // -- POST-COMBAT: GUIDE TO SUMMON --
-    { type: 'narration', speaker: 'Iselle', text: 'Master, should we summon a companion before proceeding to the next stage?' },
-    {
-      type: 'guide',
-      speaker: 'Iselle',
-      text: 'Please touch the \'Summon\' tab in the menu! As a special service for beginners, you\'ll receive gems for a guaranteed summon!',
-      target: '[data-nav="Summon"]',
-      navWait: 'Summon',
-      reward: { gems: 150 },
-    },
-    { type: 'narration', speaker: 'Iselle', text: 'Your first summon is guaranteed to give you a powerful ally! Press the ×1 button to summon.' },
+    // ── 1: REPAIR MYSTIC SPIRE ────────────────────────────────────
+    { type: 'guide',            speaker: 'Iselle',
+      text: "We must restore Townia\u2019s power! Head to the city \u2014 tap the Mystic Spire to begin repairs.",
+      target: '[data-nav="City"]', navWait: 'City' },
+
+    // ── 2: HELP HAN ───────────────────────────────────────────────
+    { type: 'narration',        speaker: 'Iselle', text: "Oh no, that poor boy! We need to help him!" },
+    { type: 'actionPrompt',     label: '[ View ]', reward: null, rewardHint: null },
+
+    // ── 3: HEAL HAN — potion + bread → 10 BD reward ──────────────
+    { type: 'narration',        speaker: 'Iselle',
+      text: "Looks like his stats have decreased from hunger and fear! Here \u2014 use the fear prevention potion. It can be purchased for 50 gems from the shop, but the first time is provided for free." },
+    { type: 'actionPrompt',     label: '[ Potion ]', reward: null, rewardHint: null },
+    { type: 'narration',        speaker: 'Han',   text: "W-What is happening to me? Who\u2026 Who are you!" },
+    { type: 'narration',        speaker: 'Iselle', text: "Hmm\u2026 He hasn\u2019t stopped shaking yet\u2026 Here. Use this bread." },
+    { type: 'actionPrompt',     label: '[ Bread ]', reward: { schematics: 10 },
+      rewardHint: "Building Schematics can be acquired in Townia. Fulfilling the roles of Master can restore the power sealed within the Mystic Spire." },
+
+    // ── 4: HAN THANKS MASTER ─────────────────────────────────────
+    { type: 'narration',        speaker: 'Han',
+      text: "Oh god\u2026 Thank you! You saved my life! I\u2019m Han Islat \u2014 and you?" },
+    { type: 'narrationDynamic', speaker: 'Iselle',
+      text: function () { return "They\u2019re " + (gameState.playerNickname || 'Master') + ", who have come to save you from this peril."; } },
+    { type: 'narration',        speaker: 'Han',
+      text: "Master\u2026 Thank you! Help me fight against these goblins, please!" },
+    { type: 'narration',        speaker: 'Iselle',
+      text: "Master! Let\u2019s help this boy fight against the goblins!" },
+
+    // ── 5: FIRST COMBAT ───────────────────────────────────────────
+    { type: 'combat' },   // reward 60 gems + 100 gold — set in runCombatCutscene
+
+    // ── 6: RETURN TO CITY ─────────────────────────────────────────
+    { type: 'narration',        speaker: 'Iselle',
+      text: "Congratulations Master! Let\u2019s take Han back to our city for now! We\u2019ve earned some Building Schematics \u2014 now we can restore the Mystic Spire!" },
+    { type: 'guide',            speaker: 'Iselle', text: "Head to the Lobby \u2014 our city awaits!",
+      target: '[data-nav="Lobby"]', navWait: 'Lobby' },
+
+    // ── 7: CITY INTRO LORE + SPIRE GUIDANCE ─────────────────────
+    { type: 'narration',        speaker: 'Iselle',
+      text: "I\u2019m sorry Master, I\u2019ve kept this city unkept for far too long\u2026" },
+    { type: 'narration',        speaker: 'Iselle',
+      text: "But don\u2019t worry! With your help, Townia will face glory once again!" },
+    { type: 'narration',        speaker: 'Iselle',
+      text: "You will need Building Schematics to upgrade the Spire, so make sure to grab some more along the way." },
+    { type: 'narration',        speaker: 'Iselle',
+      text: "Now, let\u2019s repair the Spire again." },
+
+    // ── 8: SPIRE BUILT → BAKERY UNLOCKED + 200 GOLD ──────────────
+    { type: 'guide',            speaker: 'Iselle', text: "Tap the Repair button to restore the Mystic Spire!",
+      target: '[data-nav="City"]', navWait: 'City' },
+    { type: 'spireBuilt',       reward: { gold: 200 } },
+
+    // ── 9: CITY NAME ──────────────────────────────────────────────
+    { type: 'narration',        speaker: 'Iselle',
+      text: "The Mystic Spire is regaining its power\u2026 Our City is now ready to rise from the ashes!" },
+    { type: 'cityName' },
+    { type: 'narrationDynamic', speaker: 'Iselle',
+      text: function () { return (gameState.city && gameState.city.name ? gameState.city.name : 'This city') + " is not just our home; it stands as the last line of defense against the forces of evil!"; } },
+    { type: 'narration',        speaker: 'Iselle',
+      text: "Master, you must bring back peace here as quickly as possible. Only then can the rest of the world be protected from the darkness and chaos\u2026" },
+
+    // ── 10: BAKERY UNLOCK ─────────────────────────────────────────
+    { type: 'narration',        speaker: 'Iselle', text: "Let\u2019s access the Bakery we unlocked earlier!" },
+    { type: 'bakeryUnlock' },
+
+    // ── 11: SUMMON + HEROES + TOWER GUIDANCE ─────────────────────
+    { type: 'narration',        speaker: 'Iselle',
+      text: "Master, Han Islat is from the land of harmony between humans and nonhumans \u2014 Townia." },
+    { type: 'narration',        speaker: 'Iselle',
+      text: "But a few years ago\u2026 An unknown enemy invaded the continent of peace." },
+    { type: 'narration',        speaker: 'Iselle',
+      text: "You, Master! If you wish to save the world\u2026 Climb the tower!" },
+    { type: 'narration',        speaker: 'Iselle',
+      text: "Han Islat\u2019s strength alone might not be enough\u2026 Should we summon a companion before proceeding?" },
+    { type: 'guide',            speaker: 'Iselle',
+      text: "Master! You can recruit companions through the Summoning Station here!",
+      target: '[data-nav="Summon"]', navWait: 'Summon' },
     { type: 'tutorialSummon' },
+    { type: 'guide',            speaker: 'Iselle',
+      text: "Please touch the \u2018Heroes\u2019 tab to view your newly summoned hero.",
+      target: '[data-nav="Knights"]', navWait: 'Knights' },
+    { type: 'narration',        speaker: 'Iselle',
+      text: "Would you like to form a party? Add Shay to your party to proceed!" },
+    { type: 'waitForShay' },
+    { type: 'guide',            speaker: 'Iselle', text: "Let\u2019s head to the Tower, Master!",
+      target: '[data-nav="Tower"]', navWait: 'Tower' },
 
-    // -- POST-SUMMON: CHECK HEROES --
-    { type: 'narration', speaker: 'SYSTEM', text: "Master, you're lucky! Check the hero you summoned. Please touch the 'Knights' tab in the menu." },
-    {
-      type: 'guide',
-      speaker: 'SYSTEM',
-      text: "Please touch the 'Knights' tab to view your heroes.",
-      target: '[data-nav="Knights"]',
-      navWait: 'Knights',
-    },
+    // ── 12: POST-TOWER EPILOGUE ───────────────────────────────────
+    { type: 'narration',        speaker: 'Iselle',
+      text: "The Tower remained strong even when enemies flooded the continent! It\u2019s all thanks to Goddess Durin\u2019s magic!" },
+    { type: 'narration',        speaker: 'Iselle',
+      text: "You can also send your heroes in to collect resources on your behalf." },
+    { type: 'narration',        speaker: 'Han',   text: "Yes, yes! Madam Iselle is so smart!" },
+    { type: 'narration',        speaker: 'Han',
+      text: "If you can summon more heroes, we can clear out the dangerous creatures in the tower! I can also train alongside them \u2014 we\u2019ll clear more floors! Meaning more resources!" },
+    { type: 'narration',        speaker: 'Iselle',
+      text: "Master, you can use these materials to level up your heroes!" },
 
-    // -- LOBBY SCENE: HAN MEETS SHAY --
-    { type: 'narration', speaker: 'Han', text: '...So there are other heroes here too?' },
-    { type: 'narration', speaker: 'Shay', text: "That's right. My name is Shay Radasterry \u2014 a Knight. I've been summoned by the Master." },
-    { type: 'narration', speaker: 'Han', text: "I'm Han... just a villager from the Heim region. I can barely hold a sword." },
-    { type: 'narration', speaker: 'Shay', text: "A villager? Don't sell yourself short. Every great knight started as someone ordinary." },
-    { type: 'narration', speaker: 'Han', text: 'Really? Even you?' },
-    { type: 'narration', speaker: 'Shay', text: "Well... no. I was born into a knight family. But that's beside the point! Let's fight together." },
-
-    // -- PARTY FORMATION: Wait for Master to add Shay --
-    { type: 'narration', speaker: 'SYSTEM', text: 'Would you like to form a party with the summoned heroes? Add Shay to your party to proceed!' },
-    { type: 'waitForShay', speaker: 'SYSTEM', text: 'Select the [ PARTY ] tab above, then tap an empty slot to add Shay Radasterry to your party.' },
-
-    // -- SECOND COMBAT --
-    { type: 'narration', speaker: 'Iselle', text: "If you have formed a party, let's go into battle!" },
-    { type: 'narration', speaker: 'SYSTEM', text: 'Tutorial Quest 2: Defend the village from the goblin horde!' },
-    { type: 'narration', speaker: 'Iselle', text: 'This time both heroes will fight together. Watch the difference in power between a 1-star and a 4-star!' },
-    { type: 'secondCombat' },
-
-    // -- POST-COMBAT REFLECTIONS --
-    { type: 'narration', speaker: 'Iselle', text: 'Incredible! Did you see the difference, Master? A 4-star hero is far more powerful than a 1-star commoner.' },
-    { type: 'narration', speaker: 'Iselle', text: "But don't worry \u2014 every hero can grow stronger through training, promotion, and synthesis." },
-
-    // -- SYNTHESIS TUTORIAL --
-    { type: 'narration', speaker: 'SYSTEM', text: 'Master, your heroes did an excellent job in the battle. The final tutorial awaits. The method of strengthening heroes, Synthesis! The door will open!' },
-    {
-      type: 'guide',
-      speaker: 'SYSTEM',
-      text: "Touch the 'Synthesis' tab in the menu.",
-      target: '[data-nav="Synthesis"]',
-      navWait: 'Synthesis',
-    },
-    { type: 'narration', speaker: 'SYSTEM', text: 'Drag and drop the hero you want to synthesize onto the hero you want to offer as a sacrifice. You can gain experience points. The sacrificed hero will disappear.' },
-    { type: 'tutorialSynthesis' },
-
-    // -- TUTORIAL CLOSING --
-    { type: 'narration', speaker: 'SYSTEM', text: 'This is how heroes become stronger through synthesis.' },
-    { type: 'narration', speaker: 'SYSTEM', text: "Master, believe in your bond with the hero. The future of the world is in the Master\u2019s hands!" },
-    { type: 'narration', speaker: 'SYSTEM', text: 'The tutorial has ended.' },
-    { type: 'narration', speaker: 'Iselle', text: "Tips from Iselle will always help you. Don\u2019t miss out on the valuable information to become a powerful Master!" },
-    { type: 'narration', speaker: 'SYSTEM', text: 'For more detailed strategies, please check the official forum.' },
-    { type: 'narration', speaker: 'SYSTEM', text: 'You will receive rewards. Please always check your mailbox.' },
-    { type: 'narration', speaker: 'SYSTEM', text: 'Welcome to the world of Pick Me Up!' },
     { type: 'end' },
   ];
 
@@ -1242,7 +1275,7 @@
         '</div>' +
         '<div style="color:#B8A9D0;font-size:12px;margin-top:8px">Skills: None</div>' +
       '</div>' +
-      '<div style="color:#B8A9D088;font-size:11px;margin-top:16px;font-family:\'Courier New\',monospace">[ Tap to continue ]</div>';
+      '<div style="color:#B8A9D088;font-size:11px;margin-top:16px;font-family:\'Courier New\',monospace;animation:blink 1s step-end infinite;cursor:pointer">[ Tap to continue ]</div>';
     await waitTap();
 
     // ── SYNTHESIS LAYOUT: Shay (base) ← Han (sacrifice) ──
@@ -1268,7 +1301,7 @@
           '</div>' +
         '</div>' +
       '</div>' +
-      '<div style="color:#B8A9D088;font-size:11px;margin-top:20px;font-family:\'Courier New\',monospace">[ Tap to continue ]</div>';
+      '<div style="color:#B8A9D088;font-size:11px;margin-top:20px;font-family:\'Courier New\',monospace;animation:blink 1s step-end infinite;cursor:pointer">[ Tap to continue ]</div>';
     await waitTap();
 
     // ── D20 ROLL CHOICE ──
@@ -1364,66 +1397,288 @@
     // Han absorbs Shay's residual power
     han.exp += 15;
 
-    // Send tutorial completion mail
-    if (typeof sendMail === 'function') {
-      sendMail({
-        from: 'Tutorial Guide',
-        subject: 'Tutorial Complete \u2014 Welcome to Pick Me Up!',
-        body: 'Congratulations on completing the tutorial, Master! The world awaits. Here are your welcome rewards.',
-        rewards: { gems: 300, gold: 1000 },
-      });
-    }
+    // Tutorial completion reward (no mailbox — instant via applyReward)
+    applyReward({ gems: 300, gold: 1000 });
 
     saveGame();
   }
 
+  /* ── END TUTORIAL ─────────────────────────────── */
+  function endTutorial() {
+    hideDialogue();
+    clearHighlights();
+    var ol = getEl('tut-overlay');
+    if (ol) ol.style.display = 'none';
+    gameState.tutorialStep = -1;
+    saveGame();
+    if (typeof resetHubMain === 'function') resetHubMain();
+    console.log('[Tutorial] Complete.');
+  }
+
+  /* ── CITY NAME PROMPT ─────────────────────────── */
+  async function showCityNamePrompt() {
+    var scene = getEl('tut-combat-scene');
+    scene.style.cssText = 'display:flex;justify-content:center;align-items:center;' +
+      'flex-direction:column;background:#0D0010;width:100%;min-height:320px;';
+    scene.innerHTML =
+      '<div style="font-family:\'Courier New\',monospace;text-align:center;padding:36px 44px;">' +
+        '<div style="color:#FFFFFF;font-size:18px;letter-spacing:3px;margin-bottom:8px">[ NAME YOUR CITY ]</div>' +
+        '<div style="color:#888899;font-size:11px;letter-spacing:1px;margin-bottom:24px">What shall this city be called?</div>' +
+        '<input id="tut-city-input" maxlength="16" placeholder="City name\u2026"' +
+          ' style="background:#12001A;border:2px solid #C0C0D0;color:#FFFFFF;' +
+          'font-family:\'Courier New\',monospace;font-size:15px;padding:10px 16px;' +
+          'width:200px;text-align:center;letter-spacing:2px;outline:none;"/>' +
+        '<br><br>' +
+        '<button id="tut-city-confirm"' +
+          ' style="background:#1A0025;border:2px solid #F1C40F;color:#FFFFFF;' +
+          'font-family:\'Courier New\',monospace;font-size:13px;padding:9px 28px;' +
+          'cursor:pointer;letter-spacing:1px;margin-top:8px;">[ CONFIRM ]</button>' +
+      '</div>';
+    await new Promise(function (resolve) {
+      document.getElementById('tut-city-confirm').addEventListener('click', function () {
+        var raw  = (document.getElementById('tut-city-input').value || '').trim();
+        var name = raw || 'Townia';
+        if (gameState.city) gameState.city.name = name;
+        saveGame();
+        resolve();
+      });
+    });
+    scene.style.display = 'none';
+  }
+
+  /* ── CAMERA SHAKE ─────────────────────────────── */
+  async function doShake() {
+    var ol = getEl('tut-overlay');
+    if (!ol) return;
+    var offsets = [[-6,3],[6,-3],[-4,5],[4,-2],[-3,4],[0,0]];
+    ol.style.transition = 'transform 0.08s ease';
+    for (var i = 0; i < offsets.length; i++) {
+      ol.style.transform = 'translate(' + offsets[i][0] + 'px,' + offsets[i][1] + 'px)';
+      await sleep(80);
+    }
+    ol.style.transform  = '';
+    ol.style.transition = '';
+  }
+
+  /* ── ACTION PROMPT (Potion / Bread / View) ────── */
+  async function _showActionPrompt(label, reward, hint) {
+    var scene = getEl('tut-combat-scene');
+    scene.style.cssText = 'display:flex;justify-content:center;align-items:center;' +
+      'flex-direction:column;background:#0D0010;width:100%;min-height:200px;gap:12px;';
+    scene.innerHTML =
+      '<button id="tut-action-btn"' +
+        ' style="background:#1A0025;border:2px solid #C0C0D0;color:#FFFFFF;' +
+        'font-family:\'Courier New\',monospace;font-size:14px;padding:12px 32px;' +
+        'cursor:pointer;letter-spacing:2px;box-shadow:0 0 12px rgba(123,47,190,0.5);">' +
+        escHtml(label) +
+      '</button>';
+    await new Promise(function (resolve) {
+      document.getElementById('tut-action-btn').addEventListener('click', function () {
+        if (reward) {
+          applyReward(reward);
+        }
+        resolve();
+      });
+    });
+    if (hint) {
+      scene.innerHTML =
+        '<div style="background:#12001A;border:1px solid #C0C0D0;padding:20px 28px;' +
+          'max-width:420px;font-family:\'Courier New\',monospace;">' +
+          '<div style="color:#E8D5FF;font-size:12px;line-height:1.8;letter-spacing:1px">' + escHtml(hint) + '</div>' +
+          '<div style="color:#888899;font-size:11px;margin-top:16px;text-align:center;animation:blink 1s step-end infinite;cursor:pointer">[ Tap to close ]</div>' +
+        '</div>';
+      await waitTap();
+    }
+    scene.style.display = 'none';
+  }
+
+  /* ── SPIRE BUILT ──────────────────────────────── */
+  async function _showSpireBuilt(reward) {
+    var scene = getEl('tut-combat-scene');
+    scene.style.cssText = 'display:flex;justify-content:center;align-items:center;' +
+      'flex-direction:column;background:#0D0010;width:100%;min-height:280px;';
+    var goldLine = (reward && reward.gold)
+      ? '<div style="color:#F1C40F;font-size:13px;letter-spacing:1px;margin:12px 0">\uD83E\uDE99 ' + reward.gold + ' Gold</div>'
+      : '';
+    scene.innerHTML =
+      '<div style="font-family:\'Courier New\',monospace;text-align:center;padding:32px 40px;">' +
+        '<div style="color:#4CAF50;font-size:15px;letter-spacing:3px;margin-bottom:8px">[ MYSTIC SPIRE BUILT ]</div>' +
+        '<div style="color:#E8D5FF;font-size:11px;letter-spacing:2px;margin-bottom:16px">&lt; New Building &gt; Bakery</div>' +
+        goldLine +
+        '<div id="tut-gold-info-btn" style="color:#C0C0D066;font-size:10px;letter-spacing:1px;cursor:pointer;' +
+          'margin-top:8px;border-bottom:1px dashed #C0C0D044;display:inline-block">(i) Gold</div>' +
+        '<div id="tut-gold-tip" style="display:none;color:#888899;font-size:11px;max-width:340px;' +
+          'text-align:left;margin-top:12px;line-height:1.8;">' +
+          'During the invasion, Townia experienced a severe resource sabotage. ' +
+          'Yet the Princess sacrificed her blood to the Goddess, and produced these.' +
+        '</div>' +
+        '<div style="color:#888899;font-size:11px;margin-top:20px;animation:blink 1s step-end infinite;cursor:pointer">[ Tap to close ]</div>' +
+      '</div>';
+    document.getElementById('tut-gold-info-btn').addEventListener('click', function () {
+      var tip = document.getElementById('tut-gold-tip');
+      if (tip) tip.style.display = tip.style.display === 'none' ? 'block' : 'none';
+    });
+    if (reward) {
+      applyReward(reward);
+    }
+    if (gameState.city && gameState.city.buildings) {
+      gameState.city.buildings.bakery.unlocked = true;
+      saveGame();
+    }
+    await waitTap();
+    scene.style.display = 'none';
+  }
+
+  /* ── BAKERY UNLOCK ────────────────────────────── */
+  async function _showBakeryUnlock() {
+    var scene = getEl('tut-combat-scene');
+    scene.style.cssText = 'display:flex;justify-content:center;align-items:center;' +
+      'flex-direction:column;background:#0D0010;width:100%;min-height:280px;';
+    var gold      = gameState.gold || 0;
+    var canAfford = gold >= 200;
+    scene.innerHTML =
+      '<div style="font-family:\'Courier New\',monospace;text-align:center;padding:32px 40px;min-width:280px;">' +
+        '<div style="color:#FFFFFF;font-size:15px;letter-spacing:3px;margin-bottom:16px">[ BAKERY ]</div>' +
+        '<div style="color:#888899;font-size:11px;letter-spacing:1px;margin-bottom:16px">\u2014 Resource Cost \u2014</div>' +
+        '<div style="color:#F1C40F;font-size:13px;margin-bottom:20px">\uD83E\uDE99 ' + gold + ' / 200</div>' +
+        '<button id="tut-bakery-btn"' +
+          (canAfford ? '' : ' disabled') +
+          ' style="background:#1A0025;border:2px solid ' + (canAfford ? '#F1C40F' : '#555566') + ';' +
+          'color:' + (canAfford ? '#FFFFFF' : '#555566') + ';' +
+          'font-family:\'Courier New\',monospace;font-size:13px;padding:9px 28px;' +
+          'cursor:' + (canAfford ? 'pointer' : 'default') + ';letter-spacing:1px;">[ UNLOCK ]</button>' +
+      '</div>';
+    await new Promise(function (resolve) {
+      var btn = document.getElementById('tut-bakery-btn');
+      if (!btn || !canAfford) {
+        if (!gameState.lastBreadTime) {
+          gameState.lastBreadTime = Date.now();
+          saveGame();
+          if (typeof showToast === 'function') {
+            showToast('Not enough gold \u2014 bread production started with 0 inventory.', '#F1C40F');
+          }
+        }
+        setTimeout(resolve, 1500);
+        return;
+      }
+      btn.addEventListener('click', function () {
+        gameState.gold = Math.max(0, (gameState.gold || 0) - 200);
+        if (typeof updateGoldDisplay === 'function') updateGoldDisplay();
+        var r = { wishes: 1, schematics: 40 };
+        applyReward(r);
+        gameState.lastBreadTime = Date.now();
+        saveGame();
+        resolve();
+      });
+    });
+    scene.innerHTML =
+      '<div style="font-family:\'Courier New\',monospace;text-align:center;padding:32px 40px;min-width:280px;">' +
+        '<div style="color:#4CAF50;font-size:13px;letter-spacing:2px;margin-bottom:16px">[ REPAIR REWARDS ]</div>' +
+        '<div style="color:#E8D5FF;font-size:12px;line-height:2.2;text-align:left;display:inline-block">' +
+          '1. \uD83C\uDF1F One Wish \u2014 Recruit heroes at the Summoning Station.<br>' +
+          '2. \uD83C\uDF5E Bread Production \u2014 1 unit per 8 minutes.<br>' +
+          '3. \uD83D\uDD29 40 Building Schematics.' +
+        '</div>' +
+        '<div style="color:#888899;font-size:11px;margin-top:20px;animation:blink 1s step-end infinite;cursor:pointer">[ Tap to close ]</div>' +
+      '</div>';
+    await waitTap();
+    scene.style.display = 'none';
+  }
+
   /* ── MAIN RUN FUNCTION ───────────────────────── */
   async function runTutorial() {
-    const overlay = getEl('tut-overlay');
+    var overlay = getEl('tut-overlay');
     overlay.style.display = 'block';
 
-    // Preload Iselle portrait sprite
     await loadIselleSprite();
-
-    // Give starter hero Han
     addStarterHero();
 
-    for (stepIndex = 0; stepIndex < STEPS.length; stepIndex++) {
-      const step = STEPS[stepIndex];
-      gameState.tutorialStep = stepIndex;
+    // ── CRITICAL GAP 3: Pre-grant 15 BD (idempotent across page reloads) ─
+    // Uses both gameState flag (session) and localStorage key (cross-reload)
+    // because tutorialSchematicsGranted is not in saveGame() field list.
+    var _TUT_BD_KEY = 'pickmeup_tut_bd_granted';
+    if (!localStorage.getItem(_TUT_BD_KEY) && !gameState.tutorialSchematicsGranted) {
+      gameState.schematics = (gameState.schematics || 0) + 15;
+      gameState.tutorialSchematicsGranted = true;
+      localStorage.setItem(_TUT_BD_KEY, '1');
+      saveGame();
+    }
 
-      if (step.type === 'narration') {
-        await showDialogue(step.speaker, step.text);
+    // ── CRITICAL GAP 4: Bounds check + resume support ─────────────────────
+    //
+    //   runTutorial entry
+    //        │
+    //        ▼
+    //   startStep = max(0, saved tutorialStep)
+    //        │
+    //        ▼
+    //   startStep >= STEPS.length? ──YES──▶ endTutorial()   ← OOB guard
+    //        │
+    //       NO
+    //        ▼
+    //   ┌──────────── step loop ───────────────────────────────────────────┐
+    //   │  OOB guard → save step → resolve text fn → dispatch type        │
+    //   │  stepIndex++ ──▶ next iteration                                 │
+    //   └─────────────────────────────────────────────────────────────────┘
+    //        │ (exits on 'end' type or stepIndex >= STEPS.length)
+    //        ▼
+    //   endTutorial()
+    //
+    var startStep = (typeof gameState.tutorialStep === 'number' && gameState.tutorialStep > 0)
+      ? gameState.tutorialStep : 0;
+
+    if (startStep >= STEPS.length) { endTutorial(); return; }   // OOB guard
+
+    for (stepIndex = startStep; stepIndex < STEPS.length; stepIndex++) {
+      if (stepIndex >= STEPS.length) { break; }   // belt-and-suspenders
+
+      var s    = STEPS[stepIndex];
+      var text = typeof s.text === 'function' ? s.text() : (s.text || '');
+      gameState.tutorialStep = stepIndex;
+      saveGame();
+
+      if (s.type === 'narration' || s.type === 'narrationDynamic') {
+        await showDialogue(s.speaker, text);
       }
-      else if (step.type === 'blackScreen') {
+      else if (s.type === 'cameraShake') {
         hideDialogue();
-        await showBlackScreen(step.text);
+        await doShake();
       }
-      else if (step.type === 'combat') {
+      else if (s.type === 'cutscene') {
+        hideDialogue();
+        await showBlackScreen(text);
+      }
+      else if (s.type === 'guide') {
+        await showDialogue(s.speaker, text);
+        hideDialogue();
+        overlay.style.display = 'none';
+        highlightButton(s.target);
+        await waitForNav(s.navWait);
+        overlay.style.display = 'block';
+      }
+      else if (s.type === 'actionPrompt') {
+        hideDialogue();
+        await _showActionPrompt(s.label, s.reward, s.rewardHint);
+      }
+      else if (s.type === 'combat') {
         hideDialogue();
         await runCombatCutscene();
       }
-      else if (step.type === 'guide') {
-        // Apply reward
-        if (step.reward) {
-          if (step.reward.gems) gameState.gems += step.reward.gems;
-          saveGame();
-          updateGemsDisplay();
-        }
-
-        await showDialogue(step.speaker, step.text);
+      else if (s.type === 'spireBuilt') {
         hideDialogue();
-
-        // Now show hub and highlight the button
-        overlay.style.display = 'none';
-        highlightButton(step.target);
-        await waitForNav(step.navWait);
-        overlay.style.display = 'block';
+        await _showSpireBuilt(s.reward);
       }
-      else if (step.type === 'tutorialSummon') {
+      else if (s.type === 'cityName') {
+        hideDialogue();
+        await showCityNamePrompt();
+      }
+      else if (s.type === 'bakeryUnlock') {
+        hideDialogue();
+        await _showBakeryUnlock();
+      }
+      else if (s.type === 'tutorialSummon') {
         hideDialogue();
         overlay.style.display = 'none';
-        // Highlight the 1x pull button (guaranteed summon)
         await sleep(400);
         var pullBtn = document.getElementById('pull-1x-btn');
         if (pullBtn) pullBtn.classList.add('tut-highlight');
@@ -1431,42 +1686,18 @@
         if (pullBtn) pullBtn.classList.remove('tut-highlight');
         overlay.style.display = 'block';
       }
-      else if (step.type === 'partyFormation') {
-        await showDialogue(step.speaker, step.text);
-        hideDialogue();
-        overlay.style.display = 'none';
-        await waitForPartySize(step.minSize || 2);
-        overlay.style.display = 'block';
-      }
-      else if (step.type === 'waitForShay') {
-        await showDialogue(step.speaker, step.text);
+      else if (s.type === 'waitForShay') {
         hideDialogue();
         overlay.style.display = 'none';
         await waitForShayInParty();
         overlay.style.display = 'block';
       }
-      else if (step.type === 'secondCombat') {
-        hideDialogue();
-        await runSecondCombat();
-      }
-      else if (step.type === 'tutorialSynthesis') {
-        hideDialogue();
-        await runSynthesisTutorial();
-      }
-      else if (step.type === 'end') {
+      else if (s.type === 'end') {
         break;
       }
     }
 
-    // Cleanup
-    hideDialogue();
-    clearHighlights();
-    overlay.style.display = 'none';
-    gameState.tutorialStep = -1;  // completed
-    saveGame();
-
-    // Return to lobby
-    if (typeof resetHubMain === 'function') resetHubMain();
+    endTutorial();
   }
 
   /* ── STARTER HERO ─────────────────────────────── */
@@ -1516,5 +1747,13 @@
   }
 
   window.runTutorial           = runTutorial;
+  window.endTutorial           = endTutorial;
+  window.showCityNamePrompt    = showCityNamePrompt;
+  // isNewbie: true while tutorial is in progress (tutorialStep !== -1)
+  // clearNewbieTag: called from recordFloorClear() when Tower floor 1 clears
+  window.isNewbie              = function () { return gameState.tutorialStep !== -1; };
+  window.clearNewbieTag        = function () {
+    if (gameState.tutorialStep !== -1) { gameState.tutorialStep = -1; saveGame(); }
+  };
   window.registerSceneTutorial = registerSceneTutorial;
 })();
